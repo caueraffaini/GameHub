@@ -22,6 +22,7 @@
     "@opentelemetry/exporter-trace-otlp-grpc": "0.48.0",
     "@opentelemetry/sdk-metrics": "1.21.0",
     "@opentelemetry/sdk-node": "0.48.0",
+    "argon2": "^0.44.0",
     "bullmq": "^5.79.0",
     "ioredis": "^5.11.1",
     "pg": "^8.11.3",

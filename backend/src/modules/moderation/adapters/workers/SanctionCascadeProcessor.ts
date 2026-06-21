@@ -2,24 +2,26 @@
 
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
-import { Inject, Logger } from '@nestjs/common';
-import { DataSource } from 'typeorm';
-import { InjectDataSource } from '@nestjs/typeorm';
+import { Inject, Logger, Injectable } from '@nestjs/common';
 
-import { UserEntity } from '../../../identity/adapters/persistence/User.entity';
-import { MatchmakingTicketEntity } from '../../../matchmaking/adapters/persistence/MatchmakingTicket.entity';
-import { PlayAreaReservationEntity } from '../../../facilities/adapters/persistence/PlayAreaReservation.entity';
-
+import { IUserRepositoryPort, IUserRepositoryPortToken } from '../../../identity/ports/outbound/IUserRepositoryPort';
+import { ITicketRepositoryPort, ITicketRepositoryPortToken } from '../../../matchmaking/ports/outbound/ITicketRepositoryPort';
+import { IPlayAreaReservationRepositoryPort, IPlayAreaReservationRepositoryPortToken } from '../../../facilities/ports/outbound/IPlayAreaReservationRepositoryPort';
 import { IDeviceTokenRepositoryPort, IDeviceTokenRepositoryPortToken } from '../../../matchmaking/ports/outbound/IDeviceTokenRepositoryPort';
 import { INotificationServicePort, INotificationServicePortToken } from '../../../matchmaking/ports/outbound/INotificationServicePort';
 
 @Processor('sanction-cascade')
+@Injectable()
 export class SanctionCascadeProcessor extends WorkerHost {
   private readonly logger = new Logger(SanctionCascadeProcessor.name);
 
   constructor(
-    @InjectDataSource()
-    private readonly dataSource: DataSource,
+    @Inject(IUserRepositoryPortToken)
+    private readonly userRepo: IUserRepositoryPort,
+    @Inject(ITicketRepositoryPortToken)
+    private readonly ticketRepo: ITicketRepositoryPort,
+    @Inject(IPlayAreaReservationRepositoryPortToken)
+    private readonly reservationRepo: IPlayAreaReservationRepositoryPort,
     @Inject(IDeviceTokenRepositoryPortToken)
     private readonly deviceTokenRepo: IDeviceTokenRepositoryPort,
     @Inject(INotificationServicePortToken)
@@ -32,37 +34,15 @@ export class SanctionCascadeProcessor extends WorkerHost {
     const { userId } = job.data;
     this.logger.log(`Processing sanction cascade for user ${userId}`);
 
-    // Atomic transaction for database modifications
-    await this.dataSource.transaction('SERIALIZABLE', async (entityManager) => {
-      // 1. Override availabilityStatus to OFFLINE
-      await entityManager.createQueryBuilder()
-        .update(UserEntity)
-        .set({ availabilityStatus: 'OFFLINE' })
-        .where('id = :id', { id: userId })
-        .execute();
+    // Boundary rule Section 1.4.2: call ports instead of direct table queries
+    // 1. Override availability to OFFLINE
+    await this.userRepo.updateStatus(userId, 'OFFLINE');
 
-      // 2. Purge active matchmaking tickets (status WAITING)
-      const tickets = await entityManager.find(MatchmakingTicketEntity, {
-        where: { userId, status: 'WAITING' },
-      });
-      for (const ticket of tickets) {
-        ticket.status = 'CANCELLED';
-        await entityManager.save(MatchmakingTicketEntity, ticket);
-      }
+    // 2. Purge active matchmaking tickets
+    await this.ticketRepo.cancelActiveByUser(userId);
 
-      // 3. Cancel upcoming play area reservations (status CONFIRMED and startTime > now)
-      const now = new Date();
-      const reservations = await entityManager.find(PlayAreaReservationEntity, {
-        where: { userId, status: 'CONFIRMED' },
-      });
-      const upcoming = reservations.filter(
-        (r) => new Date(r.scheduledStartTime).getTime() > now.getTime(),
-      );
-      for (const res of upcoming) {
-        res.status = 'CANCELLED';
-        await entityManager.save(PlayAreaReservationEntity, res);
-      }
-    });
+    // 3. Cancel upcoming play area reservations
+    await this.reservationRepo.cancelUpcomingByUser(userId);
 
     // 4. Dispatch high-priority native silent push notification
     try {

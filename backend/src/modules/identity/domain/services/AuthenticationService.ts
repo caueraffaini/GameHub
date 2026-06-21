@@ -20,7 +20,7 @@ export class AuthenticationService implements IAuthenticationUseCase {
       throw new UnauthorizedException('Invalid NUSP or PIN');
     }
 
-    const isValid = user.validatePin(pin);
+    const isValid = await user.validatePin(pin);
     if (!isValid) {
       throw new UnauthorizedException('Invalid NUSP or PIN');
     }

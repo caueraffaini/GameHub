@@ -19,43 +19,39 @@ describe('User Domain Model Invariants', () => {
   });
 
   describe('PIN Hashing & Validation Logic', () => {
-    it('should successfully set and hash a valid 4-digit PIN', () => {
-      user.updatePin('1234');
+    it('should successfully set and hash a valid 4-digit PIN', async () => {
+      await user.updatePin('1234');
       expect(user.pinHash).toBeDefined();
-      expect(user.pinHash).toContain(':');
-      
-      const [salt, hash] = user.pinHash.split(':');
-      expect(salt).toHaveLength(32); // 16 bytes random hex
-      expect(hash).toHaveLength(128); // 64 bytes sha512 hex
+      expect(user.pinHash).toContain('$argon2');
     });
 
-    it('should throw error when updating PIN with non-4-digit value', () => {
-      expect(() => user.updatePin('123')).toThrow('PIN must be exactly 4 digits');
-      expect(() => user.updatePin('12345')).toThrow('PIN must be exactly 4 digits');
-      expect(() => user.updatePin('abcd')).toThrow('PIN must be exactly 4 digits');
-      expect(() => user.updatePin('')).toThrow('PIN must be exactly 4 digits');
+    it('should throw error when updating PIN with non-4-digit value', async () => {
+      await expect(user.updatePin('123')).rejects.toThrow('PIN must be exactly 4 digits');
+      await expect(user.updatePin('12345')).rejects.toThrow('PIN must be exactly 4 digits');
+      await expect(user.updatePin('abcd')).rejects.toThrow('PIN must be exactly 4 digits');
+      await expect(user.updatePin('')).rejects.toThrow('PIN must be exactly 4 digits');
     });
 
-    it('should validate a correct PIN successfully', () => {
-      user.updatePin('4321');
-      expect(user.validatePin('4321')).toBe(true);
+    it('should validate a correct PIN successfully', async () => {
+      await user.updatePin('4321');
+      expect(await user.validatePin('4321')).toBe(true);
     });
 
-    it('should fail validation for an incorrect PIN', () => {
-      user.updatePin('4321');
-      expect(user.validatePin('1111')).toBe(false);
+    it('should fail validation for an incorrect PIN', async () => {
+      await user.updatePin('4321');
+      expect(await user.validatePin('1111')).toBe(false);
     });
 
-    it('should fail validation if input PIN is not 4 digits', () => {
-      user.updatePin('4321');
-      expect(user.validatePin('432')).toBe(false);
-      expect(user.validatePin('43210')).toBe(false);
-      expect(user.validatePin('aaaa')).toBe(false);
+    it('should fail validation if input PIN is not 4 digits', async () => {
+      await user.updatePin('4321');
+      expect(await user.validatePin('432')).toBe(false);
+      expect(await user.validatePin('43210')).toBe(false);
+      expect(await user.validatePin('aaaa')).toBe(false);
     });
 
-    it('should fail validation if pinHash is malformed', () => {
+    it('should fail validation if pinHash is malformed', async () => {
       user.pinHash = 'invalidhash';
-      expect(user.validatePin('1234')).toBe(false);
+      expect(await user.validatePin('1234')).toBe(false);
     });
   });
 

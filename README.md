@@ -1,233 +1,178 @@
 # GameHub Core Monorepo
 
-Unified campus sports, matchmaking, and reservation portal structured as a Hexagonal (Ports & Adapters) modular application utilizing npm workspaces.
+Unified campus sports, matchmaking, and reservation portal structured as a Hexagonal (Ports & Adapters) modular monolith.
 
 ---
 
-## Directory Layout
+## 1. Project Layout & Architecture
+
+The application is organized under a single NestJS monorepo, separating features into decoupled module boundaries inside the `backend/src/modules/` directory.
+
+### Core Modules
+* **Identity**: Manages user profiles, team roster mutations, and dual-token authentication.
+* **Facilities**: Coordinates physical/virtual play area structures, schedules, and timeslot reservations.
+* **Matchmaking**: Coordinates player queues via Redis, manages matchmaking tickets, and handles websocket presence.
+* **Matches**: Implements match states, rules validation, and score sheets.
+* **Progression**: Controls ELO ranking calculation, ELO ledger traces, and leaderboards.
+* **Tournaments**: Automates bracket tree propagation for single/double-elimination and round-robin events.
+* **Moderation & Social**: Manages chat channels, report tickets, dispute resolution, and sanction cascades.
 
 ```
-/home/caue/GameHub/
-├── .github/
-│   └── workflows/
-│       └── ci.yml                          # GitHub Actions workflow (build, lint, test, docker)
-├── architecture/
-│   ├── gamehub_architecture.pdf            # Compiled system architecture specification (57 pages)
-│   ├── gamehub_architecture.tex            # LaTeX source for the architecture specification
-│   └── gamehub_architecture_v3_fixed.md    # Markdown representation of the specification
-├── backend/
-│   ├── Dockerfile                          # Optimized multi-stage Docker build config
-│   ├── init-structure.sh                   # Monolith sub-folder initializer script
-│   ├── jest.config.js                      # Jest workspace unit-testing rules
-│   ├── package.json                        # Backend workspace manifest & script definitions
-│   ├── schema.sql                          # PostgreSQL schema (users, play_areas, reservations, tickets, teams, rosters)
-│   └── src/
-│       ├── main.ts                         # NestJS application bootstrap entrypoint
-│       ├── shared/
-│       │   └── telemetry/
-│       │       ├── __tests__/
-│       │       │   └── otel-bootstrap.spec.ts # Observability bootstrap validation test
-│       │       └── otel-bootstrap.ts       # OpenTelemetry NodeSDK bootstrap configuration
-│       └── modules/
-│           ├── facilities/
-│           │   └── domain/
-│           │       └── models/
-│           │           └── PlayArea.ts     # Decoupled PlayArea model supporting multiple games
-│           ├── matchmaking/
-│           │   └── domain/
-│           │       └── models/
-│           │           └── Match.ts        # Match model with optional reservation bindings
-│           └── identity/
-│               ├── identity.module.ts      # Identity NestJS module wiring ports to adapters
-│               ├── domain/
-│               │   ├── models/
-│               │   │   ├── Team.ts         # OfficialTeam, TemporaryEventTeam, and TeamRoster models
-│               │   │   └── User.ts         # User model containing PIN validations and anonymization
-│               │   └── services/
-│               │       ├── AuthenticationService.ts # Credentials validation & dual-token generation
-│               │       ├── JwtHelper.ts    # Self-contained HMAC-SHA256 signature cryptographic helper
-│               │       └── TeamManagementService.ts # Team creation and roster validation service
-│               ├── ports/
-│               │   ├── inbound/
-│               │   │   ├── IAuthenticationUseCase.ts # Login and token refresh use case definitions
-│               │   │   └── ITeamManagementUseCase.ts # Roster mutations and team creation definitions
-│               │   └── outbound/
-│               │       ├── ITeamRepositoryPort.ts # Outbound interface for team storage
-│               │       └── IUserRepositoryPort.ts # Outbound interface for user storage
-│               └── adapters/
-│                   ├── persistence/
-│                   │   ├── Team.entity.ts  # Database mapper representing teams
-│                   │   ├── TeamRepository.ts # Outbound repository adapter implementing ITeamRepositoryPort
-│                   │   ├── TeamRoster.entity.ts # Database mapper representing team memberships
-│                   │   ├── User.entity.ts  # Database mapper representing user profiles
-│                   │   └── UserRepository.ts # Outbound repository adapter implementing IUserRepositoryPort
-│                   └── transport/
-│                       ├── AuthController.ts # REST endpoints for /auth/login and /auth/refresh
-│                       ├── TeamController.ts # REST endpoints for /teams/official, /teams/temporary, and rosters
-│                       └── guards/
-│                           ├── JwtAuthGuard.ts # Guards matching Bearer tokens
-│                           ├── RolesGuard.ts # Guard checking custom route annotations
-│                           └── roles.decorator.ts # Custom @Roles route decorator
-├── jest.config.js                          # Root Jest configuration coordinating workspaces
-├── package.json                            # Root monorepo manifest setting up npm workspaces
-├── git-setup-deploy.sh                     # Setup staging and release verification script
-├── LICENSE                                 # Project MIT License
-└── AGENTS.md                               # Agent behavioral constraints and instructions
+backend/src/
+├── main.ts                          # Node SDK / NestJS Application Entrypoint
+├── shared/
+│   ├── events/                      # Shared event bus dispatcher adapter
+│   ├── filters/                     # Global exception filtering and serialization
+│   └── telemetry/                   # OpenTelemetry bootstrap hooks and manual metrics
+└── modules/
+    ├── identity/                    # Core profile data & credentials domain
+    ├── facilities/                  # Reservations & play areas module
+    ├── matchmaking/                 # Matchmaking ticket ingest/egress and websocket gateway
+    ├── matches/                     # In-progress match logs & score validation
+    ├── progression/                 # Elo calculations & immutable ledgers
+    ├── tournaments/                 # Brackets engine and standings processors
+    └── moderation/                  # Chat moderation, report queues, and sanction enforcer
+```
+
+### Dependency Inversion Symbols & Ports
+To maintain modular boundaries and strictly forbid direct cross-module database imports, services communicate across module borders using NestJS dependency injection tokens.
+
+| Injection Token | Interface / Port | Target Module Provider |
+| :--- | :--- | :--- |
+| `IUserRepositoryPortToken` | `IUserRepositoryPort` | Identity Persistence Adapter |
+| `ITeamRepositoryPortToken` | `ITeamRepositoryPort` | Identity Persistence Adapter |
+| `IPlayAreaRepositoryPortToken` | `IPlayAreaRepositoryPort` | Facilities Persistence Adapter |
+| `IPlayAreaReservationRepositoryPortToken` | `IPlayAreaReservationRepositoryPort` | Facilities Persistence Adapter |
+| `ITicketRepositoryPortToken` | `ITicketRepositoryPort` | Matchmaking Redis/DB Adapter |
+| `IDeviceTokenRepositoryPortToken` | `IDeviceTokenRepositoryPort` | Matchmaking Persistence Adapter |
+| `INotificationServicePortToken` | `INotificationServicePort` | Matchmaking Notification Adapter |
+| `IReservationUseCaseToken` | `IReservationUseCase` | Facilities Core Service |
+| `ITeamManagementUseCaseToken` | `ITeamManagementUseCase` | Identity Core Service |
+| `IAuthenticationUseCaseToken` | `IAuthenticationUseCase` | Identity Core Service |
+
+---
+
+## 2. Concurrency & Optimistic Concurrency Control (OCC)
+
+To prevent resource contention (e.g. two groups booking a physical foosball table for the same timeslot), the scheduling engine employs a dual concurrency guard:
+
+### Serializable Transactions
+All reservation allocations and ELO calculation routines execute under a `SERIALIZABLE` transaction isolation level. This blocks phantom reads and ensures chronological serialization of race conditions.
+
+### Version-Column OCC
+The `PlayArea` entity maps a `@VersionColumn()` field tracking structural state updates. 
+```typescript
+@Entity('play_areas')
+export class PlayAreaEntity {
+  @VersionColumn()
+  version: number;
+}
+```
+
+### "Matched but Homeless" Recovery Loop
+During matchmaking pair allocation, if another process books the selected play area first, a collision triggers an `OptimisticLockException`. The recovery loop intercepts the failure:
+1. **Intercept & Rollback**: Aborts the active SQL transaction.
+2. **Re-Queue with Score 0**: Re-injects both tickets back into the Redis Sorted Set (ZSET) queue with a score of `0`. This guarantees absolute priority at the front of the queue, bypassing standard age scores.
+```
+[Pair Formed] -> [Start Transaction] -> [Reserve Play Area (OCC Check)]
+                      |
+                      +---> [Success] ---> [Commit Match]
+                      |
+                      +---> [OptimisticLockException]
+                                   |
+                            [Rollback SQL]
+                                   |
+                     [Re-Queue Tickets (ZSET Score 0)]
 ```
 
 ---
 
-## Architectural Specifications
+## 3. Real-Time WebSocket Gateway & Disconnection Lifecycles
 
-### 1. Dynamic Physical PlayAreas & Multi-Game Resource Mapping
-- **Administrative Flexibility**: The count and type of physical play areas (e.g., billiard tables, foosball tables) are managed dynamically through DB entries rather than being hardcoded in application logic.
-- **Relational Decoupling**: A linking table `play_area_supported_games` decouples the game types from physical play area structures. This allows a single physical asset (e.g., Billiard Table 01) to support multiple game types simultaneously (e.g., both `BOLA_8` and `SNOOKER`).
-- **Conflict Booking Policy**: Reserving a timeslot for one game type automatically blocks all other supported game types on that specific physical table for the duration of that reserved window. This is enforced via composite slot uniqueness constraints inside `play_area_reservations`.
+The real-time layer coordinates client presence and timeouts using a hybrid Redis-BullMQ architecture.
 
-### 2. Transient Virtual Table Lifecycle
-- **Zero Infrastructure Card Games**: Card games (`TRUCO`, `BURACO`) bypass physical table constraints.
-- **Dynamic Initialization & Immediate Auto-Deletion**: Virtual play areas are created dynamically in-memory or transiently in database tables when a matchmaking pair is formed, and are programmatically deleted immediately upon match finalization.
-- **Bypassing Bottlenecks**: Virtual matches bypass physical reservation lookups, scheduling locks, and Optimistic Concurrency Control (OCC) version verifications entirely, preventing scaling bottlenecks on card game matches.
+### Presence Tracking (`MatchGateway`)
+* **Namespace**: Connected clients join the `/match` websocket namespace.
+* **Heartbeat Ingest**: Every 5 seconds, clients emit a `heartbeat` frame. The gateway updates a volatile key in Redis:
+  `SET gamehub:heartbeat:{userId} "active" EX 15`
+* **Minimized Presence (App Backgrounding)**: When the client backgrounds the app, it emits `minimize_presence`. The gateway extends the TTL to accommodate longer connection loss:
+  `EX 60`
 
-### 3. Dual-Token Authentication Strategy & Mobile Fallback
-- **4-Digit Numerical PIN**: Authentication is refactored from generic alphanumeric passwords to 4-digit numerical PINs (securely hashed and compared via PBKDF2/scrypt key derivation), optimizing authentication interfaces on dynamic kiosks and mobile containers.
-- **Access Tokens**: Short-lived (15 minutes) JWTs signed via HMAC-SHA256 containing user metadata and explicit RBAC claims (`sub`, `roles`, `instituteId`, `courseId`).
-- **Refresh Tokens**: Long-lived (7 days) session tokens. The authentication controller intercepts refresh tokens from either an incoming `HttpOnly` secure cookie or an explicit `X-Refresh-Token` request header to support WebKit mobile shells (Capacitor/iOS) where cookies are silently purged.
-- **Access Control**: Guards `JwtAuthGuard` and `RolesGuard` retrieve claims and match route configurations configured by custom `@Roles(...)` decorators.
-
-### 4. Automated CI/CD Pipeline
-- **Monorepo Workflow**: Configured at `.github/workflows/ci.yml` to trigger on pushes and pull requests to `main`.
-- **Validation**: Enforces sequential stages for dependency checking, linting, type-checking, and test suite execution.
-- **Optimized Compilation**: Triggers a multi-stage Docker build (based on `backend/Dockerfile`) with optimized GitHub Actions caching (`cache-from: type=gha`, `cache-to: type=gha,mode=max`) to mitigate pipeline execution lag.
-
-### 5. Facilities & Reservations (Phase 3)
-- **Custom DI Tokens**:
-  - `IPlayAreaRepositoryPortToken`: Maps `IPlayAreaRepositoryPort` to persistence repository adapter.
-  - `IPlayAreaReservationRepositoryPortToken`: Maps `IPlayAreaReservationRepositoryPort` to persistence repository adapter.
-  - `IReservationUseCaseToken`: Maps `IReservationUseCase` to core domain reservation service.
-- **Reservation State Machine**:
-  - Valid transitions: `CONFIRMED` -> `ACTIVE` -> `COMPLETED`.
-  - Cancellation transitions: `CONFIRMED` / `ACTIVE` -> `CANCELLED`. Invalid state transitions throw exception.
-- **Concurrency & Transaction Control**:
-  - Overrides write paths to execute within `SERIALIZABLE` transaction isolation level.
-  - Implements Optimistic Concurrency Control (OCC) via `@VersionColumn()` on `PlayArea` entity.
-  - Allocation path throws custom `OptimisticLockException` if transaction fails to lock (affected count 0, database busy, or serialization failures).
-- **Open API REST Endpoints (JwtAuthGuard-Protected)**:
-  - `POST /reservations`: Create timeslot booking (enforces max 14-day limit, overlap conflicts, and OCC).
-  - `POST /reservations/:id/activate`: Transitions reservation status to `ACTIVE`.
-  - `POST /reservations/:id/complete`: Transitions reservation status to `COMPLETED`.
-  - `POST /reservations/:id/cancel`: Transitions reservation status to `CANCELLED`.
-
-### 6. Matchmaking & Realtime (Phase 4)
-- **Real-Time Gateway & Heartbeat Lifecycle**:
-  - Implements `MatchGateway` using `@WebSocketGateway` under the namespace `/match` with CORS enabled.
-  - Catches the `heartbeat` event from clients (emitted every 5 seconds) to set or refresh a volatile string key `gamehub:heartbeat:{userId}` in Redis with `EX 15`.
-  - Catches the `minimize_presence` event from mobile clients (emitted upon app backgrounding) to extend the heartbeat key TTL to `EX 60`.
-- **Redis Keyspace Event Subscription**:
-  - Configures Redis to emit keyspace expiry notifications (`notify-keyspace-events KEA`).
-  - Implements `HeartbeatKeyspaceSubscriber` to subscribe to the `__keyevent@0__:expired` channel.
-  - Automatically captures expired heartbeat keys and enqueues a `'timeout'` job into the BullMQ `heartbeat-timeout-handler` queue.
-- **BullMQ Timeout worker**:
-  - Implements `HeartbeatTimeoutProcessor` to process timeout jobs sequentially.
-  - **Step 1**: Transitions user availability status to `OFFLINE` in the database.
-  - **Step 2**: Cancels all active `MatchmakingTickets` for the user (transitions status to `CANCELLED`).
-  - **Step 3**: Identifies active matches (`IN_PROGRESS` or `PENDING_RESOURCE_ALLOCATION`) and executes forfeit logic (transitions status to `COMPLETED` and reverts other player to `AVAILABLE`).
-  - **Step 4**: Cancels upcoming `PlayAreaReservation`s for the forfeiting user.
-  - **Step 5**: Retrieves user's registered push tokens and dispatches silent push notification payloads via `INotificationServicePort` with event name `HEARTBEAT_EXPIRED`.
-
-### 7. Matches & Progression (Phase 5)
-- **Match Lifecycle State Machine**:
-  - Encapsulates match transitions across `PENDING_RESOURCE_ALLOCATION`, `IN_PROGRESS`, `COMPLETED`, `DISPUTED`, and `CANCELLED`.
-- **Score Submission & Validation**:
-  - Enforces strict scoring boundaries per `GameType` (e.g. `PINGPONG` requires $\ge 11$ points and win-by-2 if score exceeds 11; `PEBOLIM` requires $\ge 5$; `TRUCO` requires $\ge 12$).
-  - Implements ELO-safe forfeit semantics: winner receives default maximum score (11 for physical games, 2 for card games) while forfeiter is locked at 0.
-- **Transactional ELO Calculation Engine**:
-  - Listens to `MatchFinalizedEvent` and executes ELO rating adjustments sequentially (using RxJS `concatMap`) within highly isolated `SERIALIZABLE` database transactions.
-  - Appends ELO change vector traces to the structurally immutable `elo_ledger` table.
-  - Updates `PlayerRanking` records atomically.
-  - Anti-Inflation Mitigation: Caps maximum ELO delta changes to `+/- 32` per match.
-- **REST Endpoints (JwtAuthGuard-Protected)**:
-  - `POST /matches/:id/score`: Submit scores and finalize match.
-
-### 8. Events & Tournaments (Phase 6)
-- **Core Bracket Generation Engine**:
-  - Implements complete structural algorithms supporting `SINGLE_ELIMINATION`, `DOUBLE_ELIMINATION`, and `ROUND_ROBIN` formats.
-  - Automatically handles byes in the first round by generating completed bye matches and propagating players to subsequent rounds.
-  - Circle method (Berger tables) for generating optimal, non-overlapping `ROUND_ROBIN` schedules.
-- **Asynchronous Standings & Bracket Worker (BullMQ)**:
-  - Listens to `MatchFinalizedEvent` asynchronously, dispatching jobs to the `tournament-updates` BullMQ queue. This decouples bracket updates from synchronous API requests, mitigating database line locking and transactional deadlocks.
-  - Decoupled `advanceWinner()` logic transitions winners up parent-child nodes via matching `parentSlotId` tree links.
-  - Double elimination loser drop-downs seamlessly map defeated Winners bracket participants into the corresponding Losers bracket slots.
-  - Recalculates `GroupStanding` records (points, matches won/lost, score differential) for Round Robin matches.
-  - Automatically compiles event leaderboards by updating `EventScore` (+10 points for win, +2 points for loss).
-- **REST Endpoints**:
-  - `POST /tournaments`: Generates brackets/pairings, inserts match records, and initializes standings/leaderboards.
-  - `GET /tournaments/:id/bracket`: Retrieves bracket structure including slots and match details.
-  - `GET /tournaments/:id/standings`: Retrieves sorted group standings (Round Robin).
-  - `GET /events/:id/leaderboard`: Retrieves sorted event leaderboard scores.
-
-### 9. Social & Moderation (Phase 7)
-- **Real-Time Chat & Block Filters**:
-  - Implements the `ChatGateway` under the `/chat` namespace.
-  - Supports private messaging (`PRIVATE_MESSAGE`), match room (`MATCH_ROOM`), and campus lobby (`LOBBY`) channels.
-  - Friendship block filter: intercepts and evaluates block states before dispatching messages. If friendship status between the sender and recipient (or the channel participant) is set to `BLOCKED`, the gateway completely rejects the transmission vector.
-- **Redis Token-Bucket Rate Limiter**:
-  - Chat spam mitigation: implements a Redis-backed token bucket algorithm to rate-limit WebSocket message frames.
-  - Bucket Configuration: Capacity of 5 tokens, refill rate of 1 token/second.
-  - Rejection: Returns a standardized `chat_error` event with `SPAM_REJECTED` status to the sender without crashing the gateway connection pipeline.
-- **Match Disputes & ELO Locking Coordination**:
-  - Create dispute: Transition ELO ledger records for the matching match to a `LOCKED` state immediately in a transaction, preventing further progression runs or modifications, and fires an admin dashboard logging alert.
-  - Resolve dispute: Transition dispute to `RESOLVED`, recalculates correct ELO values if a correction is supplied (using `EloRatingService`), structurally updates the `PlayerRanking` values by subtracting the old delta and adding the correct one, corrects the ledger entries, and transitions ledger status back to `COMPLETED` (unlocked).
-- **Sanction Cascades Background Worker (BullMQ)**:
-  - Worker `sanction-cascade` processes ban activations (`TEMP_BAN`, `PERMANENT_BAN`).
-  - Ban activation transaction:
-    - Sets user availability status to `OFFLINE`.
-    - Purges all active matchmaking tickets (status `WAITING` transitions to `CANCELLED`).
-    - Cancels upcoming play area reservations (status `CONFIRMED` transitions to `CANCELLED`).
-    - Dispatches a high-priority native silent push notification (payload: `USER_BANNED`) to clear out mobile device state.
+### Disconnection Detection Loop
+1. **Keyspace Expiry**: Redis is configured to broadcast expiry events: `notify-keyspace-events KEA`.
+2. **Subscription Listener**: The `HeartbeatKeyspaceSubscriber` listens to the `__keyevent@0__:expired` channel.
+3. **BullMQ Queue Ingestion**: When `gamehub:heartbeat:{userId}` expires, the subscriber pushes a timeout job into the `heartbeat-timeout-handler` queue.
+4. **BullMQ Worker (`HeartbeatTimeoutProcessor`)**:
+   * Transitions user status to `OFFLINE`.
+   * Cancels active matchmaking tickets (`status = 'CANCELLED'`).
+   * Forfeits active matches in progress (winner receives default score; forfeiter ELO drops).
+   * Cancels upcoming play area bookings.
+   * Dispatches high-priority silent push notification (`HEARTBEAT_EXPIRED`) to user devices.
 
 ---
 
-## Developer Onboarding & Setup
+## 4. Authentication and Hashing Security Matrix
 
-### 1. Monorepo Setup
-From the repository root, install dependencies across all workspaces:
+Credentials and session distribution are segmented based on client request context.
+
+### Token Delivery Channels
+* **Standard Web Clients**: Access and Refresh tokens are written directly into secure, `HttpOnly`, `SameSite=Strict`, TLS-forced cookies to prevent XSS exfiltration.
+* **Mobile Shells (WebKit / Capacitor)**: In environments where cookies are dropped, the controller detects user-agent headers and delivers tokens in the JSON response payload. The mobile client submits refresh requests via the custom `X-Refresh-Token` header.
+
+### Cryptographic Argon2 PIN Verification
+Dynamic kiosks and mobile clients utilize a 4-digit numerical PIN. Invariants are enforced at the domain boundary:
+* **Validation Constraint**: Must match the regex `/^\d{4}$/`.
+* **Argon2 Hashing**: Standard password hashes use Argon2id configurations. Verification and updates execute asynchronously to prevent main event-loop blocking:
+  ```typescript
+  // Hash
+  this.pinHash = await argon2.hash(newPin);
+  // Verify
+  return await argon2.verify(this.pinHash, pin);
+  ```
+
+---
+
+## 5. Observability and Prometheus Metrics Standard
+
+Manual OpenTelemetry meters are registered inside `otel-bootstrap.ts` and track telemetry patterns natively:
+
+| Metric Name | Type | Unit | Description |
+| :--- | :--- | :--- | :--- |
+| `nodejs_eventloop_lag_seconds` | Gauge | `s` | Node.js Event Loop Lag delay (via native `perf_hooks` monitor) |
+| `redis_command_latency_seconds` | Histogram | `s` | Redis command execution duration (intercepted via sendCommand proxy) |
+| `db_pool_active_connections` | Gauge | Count | Count of active connections in the PostgreSQL/TypeORM database pool |
+
+---
+
+## 6. Developer Onboarding and Command Reference
+
+### Local Installation
 ```bash
+# Install root dependencies
 npm install
-```
 
-### 2. Monorepo Directory Initialization
-Initialize the backend monolith directories using the bootstrapping script:
-```bash
+# Initialize workspace sub-structures
 cd backend
 bash init-structure.sh
 ```
 
-### 3. Database Seeding
-Seed the PostgreSQL storage layouts with the schema definition:
+### Database Initialization
 ```bash
+# Seed local schema to target Postgres instance
 psql -h localhost -U postgres -d gamehub_db -f backend/schema.sql
 ```
 
-### 4. Testing
-Run the workspace test suites via Jest:
+### Running Tests
 ```bash
-# Run tests across all workspaces
+# Run unit and integration tests across all workspaces
 npm run test
 
-# Run tests on the backend workspace specifically
-npm run test --workspace=backend
+# Run tests with coverage
+npm run test -- --coverage
 ```
 
-### 5. Running the Application
-Run the backend application in development mode:
+### Running Locally
 ```bash
+# Spin up NestJS backend in development hot-reload mode
 npm run start:backend:dev
 ```
-
-### 6. Verifying Telemetry
-Ensure the telemetry collector endpoint is configured in your environment:
-```bash
-export OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:4317"
-```
-During bootstrap, `otel-bootstrap.ts` instantiates the NodeSDK using gRPC trace and metric exporters, setting up trace hooks across all standard HTTP routing handlers.

@@ -1,4 +1,4 @@
-import * as crypto from 'crypto';
+import * as argon2 from 'argon2';
 
 export type AvailabilityStatus = 'AVAILABLE' | 'MATCHED' | 'OFFLINE';
 
@@ -20,21 +20,20 @@ export class User {
     Object.assign(this, init);
   }
 
-  validatePin(pin: string): boolean {
+  async validatePin(pin: string): Promise<boolean> {
     if (!/^\d{4}$/.test(pin)) return false;
-    const [salt, hash] = this.pinHash.split(':');
-    if (!salt || !hash) return false;
-    const computedHash = crypto.pbkdf2Sync(pin, salt, 1000, 64, 'sha512').toString('hex');
-    return computedHash === hash;
+    try {
+      return await argon2.verify(this.pinHash, pin);
+    } catch {
+      return false;
+    }
   }
 
-  updatePin(newPin: string): void {
+  async updatePin(newPin: string): Promise<void> {
     if (!/^\d{4}$/.test(newPin)) {
       throw new Error('PIN must be exactly 4 digits');
     }
-    const salt = crypto.randomBytes(16).toString('hex');
-    const hash = crypto.pbkdf2Sync(newPin, salt, 1000, 64, 'sha512').toString('hex');
-    this.pinHash = `${salt}:${hash}`;
+    this.pinHash = await argon2.hash(newPin);
   }
 
   updateAvatar(url: string): void {

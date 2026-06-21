@@ -34,6 +34,9 @@ import { ChatGateway } from '../../adapters/transport/ChatGateway';
 import { SanctionCascadeProcessor } from '../../adapters/workers/SanctionCascadeProcessor';
 import { INotificationServicePortToken } from '../../../matchmaking/ports/outbound/INotificationServicePort';
 import { IDeviceTokenRepositoryPort, IDeviceTokenRepositoryPortToken } from '../../../matchmaking/ports/outbound/IDeviceTokenRepositoryPort';
+import { IUserRepositoryPort, IUserRepositoryPortToken } from '../../../identity/ports/outbound/IUserRepositoryPort';
+import { ITicketRepositoryPort, ITicketRepositoryPortToken } from '../../../matchmaking/ports/outbound/ITicketRepositoryPort';
+import { IPlayAreaReservationRepositoryPort, IPlayAreaReservationRepositoryPortToken } from '../../../facilities/ports/outbound/IPlayAreaReservationRepositoryPort';
 
 describe('Moderation & Social Integration Tests (SQLite memory fallback)', () => {
   let moduleFixture: TestingModule;
@@ -109,9 +112,14 @@ describe('Moderation & Social Integration Tests (SQLite memory fallback)', () =>
     moderationService = moduleFixture.get<ModerationService>(ModerationService);
     chatGateway = moduleFixture.get<ChatGateway>(ChatGateway);
 
+    const userRepo = moduleFixture.get<IUserRepositoryPort>(IUserRepositoryPortToken);
+    const ticketRepo = moduleFixture.get<ITicketRepositoryPort>(ITicketRepositoryPortToken);
+    const reservationRepo = moduleFixture.get<IPlayAreaReservationRepositoryPort>(IPlayAreaReservationRepositoryPortToken);
     const deviceTokenRepo = moduleFixture.get<IDeviceTokenRepositoryPort>(IDeviceTokenRepositoryPortToken);
     sanctionProcessor = new SanctionCascadeProcessor(
-      dataSource,
+      userRepo,
+      ticketRepo,
+      reservationRepo,
       deviceTokenRepo,
       notificationPortMock,
     );

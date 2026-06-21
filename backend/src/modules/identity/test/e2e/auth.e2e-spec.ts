@@ -78,7 +78,7 @@ describe('Identity Module Integration & E2E Tests (Supertest + TypeORM SQLite)',
         availabilityStatus: 'AVAILABLE',
         isDeleted: false,
       });
-      user.updatePin('9999');
+      await user.updatePin('9999');
 
       await userPort.save(user);
 
@@ -86,7 +86,7 @@ describe('Identity Module Integration & E2E Tests (Supertest + TypeORM SQLite)',
       const dbUser = await userRepo.findOneBy({ id: user.id });
       expect(dbUser).toBeDefined();
       expect(dbUser!.nusp).toBe('87654321');
-      expect(dbUser!.pinHash).toContain(':');
+      expect(dbUser!.pinHash).toContain('$argon2');
 
       const team = new OfficialTeam({
         id: '22222222-2222-2222-2222-222222222222',
@@ -137,7 +137,7 @@ describe('Identity Module Integration & E2E Tests (Supertest + TypeORM SQLite)',
         availabilityStatus: 'OFFLINE',
         isDeleted: false,
       });
-      testUser.updatePin('5555');
+      await testUser.updatePin('5555');
       await userPort.save(testUser);
     });
 
@@ -245,7 +245,7 @@ describe('Identity Module Integration & E2E Tests (Supertest + TypeORM SQLite)',
         availabilityStatus: 'OFFLINE',
         isDeleted: false,
       });
-      testStudent.updatePin('8888');
+      await testStudent.updatePin('8888');
       await userPort.save(testStudent);
 
       // Sign token representing a user with STUDENT role

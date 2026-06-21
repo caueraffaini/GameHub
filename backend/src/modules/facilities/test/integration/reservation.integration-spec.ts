@@ -142,7 +142,7 @@ describe('Facilities & Reservations Integration Test (Testcontainers PG / SQLite
         availabilityStatus: 'OFFLINE',
         isDeleted: false,
       });
-      user1.updatePin('1111');
+      await user1.updatePin('1111');
       await userPort.save(user1);
 
       user2 = new User({
@@ -157,7 +157,7 @@ describe('Facilities & Reservations Integration Test (Testcontainers PG / SQLite
         availabilityStatus: 'OFFLINE',
         isDeleted: false,
       });
-      user2.updatePin('2222');
+      await user2.updatePin('2222');
       await userPort.save(user2);
 
       // Seed physical play area: Billiard Table supporting BOLA_8 and SNOOKER
@@ -234,7 +234,7 @@ describe('Facilities & Reservations Integration Test (Testcontainers PG / SQLite
         availabilityStatus: 'OFFLINE',
         isDeleted: false,
       });
-      user1.updatePin('1111');
+      await user1.updatePin('1111');
       await userPort.save(user1);
 
       playArea = new PlayArea({

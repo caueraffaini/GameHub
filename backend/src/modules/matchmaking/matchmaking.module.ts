@@ -19,6 +19,7 @@ import { MatchesModule } from '../matches/matches.module';
 import { ITicketRepositoryPortToken } from './ports/outbound/ITicketRepositoryPort';
 import { IDeviceTokenRepositoryPortToken } from './ports/outbound/IDeviceTokenRepositoryPort';
 import { INotificationServicePortToken } from './ports/outbound/INotificationServicePort';
+import { MatchmakingService } from './domain/services/MatchmakingService';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { INotificationServicePortToken } from './ports/outbound/INotificationSer
     HeartbeatKeyspaceSubscriber,
     HeartbeatTimeoutProcessor,
     MatchGateway,
+    MatchmakingService,
   ],
   exports: [
     ITicketRepositoryPortToken,
@@ -57,6 +59,7 @@ import { INotificationServicePortToken } from './ports/outbound/INotificationSer
     INotificationServicePortToken,
     MatchesModule,
     MatchGateway,
+    MatchmakingService,
   ],
 })
 export class MatchmakingModule {}
