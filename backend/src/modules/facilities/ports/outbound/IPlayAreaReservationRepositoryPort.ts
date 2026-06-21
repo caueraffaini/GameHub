@@ -7,4 +7,5 @@ export interface IPlayAreaReservationRepositoryPort {
   save(reservation: PlayAreaReservation): Promise<PlayAreaReservation>;
   findOverlappingReservations(playAreaId: string, startTime: Date, endTime: Date): Promise<PlayAreaReservation[]>;
   findActiveReservationsForUser(userId: string): Promise<PlayAreaReservation[]>;
+  cancelUpcomingByUser(userId: string): Promise<void>;
 }

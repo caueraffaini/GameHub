@@ -62,4 +62,23 @@ export class PlayAreaReservationRepository implements IPlayAreaReservationReposi
     });
     return entities.map((entity) => entity.toModel());
   }
+
+  async cancelUpcomingByUser(userId: string): Promise<void> {
+    const now = new Date();
+    const upcoming = await this.repo.find({
+      where: {
+        userId,
+        status: 'CONFIRMED',
+      },
+    });
+
+    const upcomingFiltered = upcoming.filter(
+      (entity) => new Date(entity.scheduledStartTime).getTime() > now.getTime(),
+    );
+
+    for (const entity of upcomingFiltered) {
+      entity.status = 'CANCELLED';
+      await this.repo.save(entity);
+    }
+  }
 }

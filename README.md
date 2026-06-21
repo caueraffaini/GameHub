@@ -118,6 +118,23 @@ Unified campus sports, matchmaking, and reservation portal structured as a Hexag
   - `POST /reservations/:id/complete`: Transitions reservation status to `COMPLETED`.
   - `POST /reservations/:id/cancel`: Transitions reservation status to `CANCELLED`.
 
+### 6. Matchmaking & Realtime (Phase 4)
+- **Real-Time Gateway & Heartbeat Lifecycle**:
+  - Implements `MatchGateway` using `@WebSocketGateway` under the namespace `/match` with CORS enabled.
+  - Catches the `heartbeat` event from clients (emitted every 5 seconds) to set or refresh a volatile string key `gamehub:heartbeat:{userId}` in Redis with `EX 15`.
+  - Catches the `minimize_presence` event from mobile clients (emitted upon app backgrounding) to extend the heartbeat key TTL to `EX 60`.
+- **Redis Keyspace Event Subscription**:
+  - Configures Redis to emit keyspace expiry notifications (`notify-keyspace-events KEA`).
+  - Implements `HeartbeatKeyspaceSubscriber` to subscribe to the `__keyevent@0__:expired` channel.
+  - Automatically captures expired heartbeat keys and enqueues a `'timeout'` job into the BullMQ `heartbeat-timeout-handler` queue.
+- **BullMQ Timeout worker**:
+  - Implements `HeartbeatTimeoutProcessor` to process timeout jobs sequentially.
+  - **Step 1**: Transitions user availability status to `OFFLINE` in the database.
+  - **Step 2**: Cancels all active `MatchmakingTickets` for the user (transitions status to `CANCELLED`).
+  - **Step 3**: Identifies active matches (`IN_PROGRESS` or `PENDING_RESOURCE_ALLOCATION`) and executes forfeit logic (transitions status to `COMPLETED` and reverts other player to `AVAILABLE`).
+  - **Step 4**: Cancels upcoming `PlayAreaReservation`s for the forfeiting user.
+  - **Step 5**: Retrieves user's registered push tokens and dispatches silent push notification payloads via `INotificationServicePort` with event name `HEARTBEAT_EXPIRED`.
+
 ---
 
 ## Developer Onboarding & Setup

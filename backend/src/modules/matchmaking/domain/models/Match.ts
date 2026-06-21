@@ -12,6 +12,8 @@ export type MatchStatus =
 export class Match {
   id: string;
   playAreaReservationId: string | null; // Optional/nullable for virtual card games which bypass physical reservations
+  player1Id: string | null;
+  player2Id: string | null;
   gameType: GameType;
   status: MatchStatus;
   startedAt: Date;

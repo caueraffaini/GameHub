@@ -27,4 +27,8 @@ export class UserRepository implements IUserRepositoryPort {
     const saved = await this.repo.save(entity);
     return saved.toModel();
   }
+
+  async updateStatus(id: string, status: 'AVAILABLE' | 'MATCHED' | 'OFFLINE'): Promise<void> {
+    await this.repo.update(id, { availabilityStatus: status });
+  }
 }

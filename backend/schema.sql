@@ -79,6 +79,8 @@ CREATE INDEX idx_matchmaking_tickets_status ON matchmaking_tickets(status);
 CREATE TABLE matches (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     play_area_reservation_id UUID REFERENCES play_area_reservations(id) ON DELETE SET NULL,
+    player1_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    player2_id UUID REFERENCES users(id) ON DELETE SET NULL,
     game_type VARCHAR(50) NOT NULL,
     status VARCHAR(50) NOT NULL, -- PENDING_RESOURCE_ALLOCATION, IN_PROGRESS, COMPLETED, DISPUTED, CANCELLED
     started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -114,3 +116,14 @@ CREATE TABLE team_rosters (
 );
 
 CREATE INDEX idx_team_rosters_user ON team_rosters(user_id);
+
+-- 8. Device Tokens Table
+CREATE TABLE device_tokens (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_string VARCHAR(500) NOT NULL UNIQUE,
+    platform VARCHAR(50) NOT NULL
+);
+
+CREATE INDEX idx_device_tokens_user ON device_tokens(user_id);
+

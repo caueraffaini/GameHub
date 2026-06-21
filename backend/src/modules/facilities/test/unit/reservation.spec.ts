@@ -65,6 +65,7 @@ describe('Facilities Reservation Unit Tests', () => {
         save: jest.fn(),
         findOverlappingReservations: jest.fn(),
         findActiveReservationsForUser: jest.fn(),
+        cancelUpcomingByUser: jest.fn(),
       };
       mockDataSource = {
         transaction: jest.fn(),
