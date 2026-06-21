@@ -28,7 +28,8 @@ CREATE TABLE play_areas (
     name VARCHAR(100) NOT NULL,
     status VARCHAR(50) NOT NULL DEFAULT 'EMPTY', -- EMPTY, IN_USE, MAINTENANCE
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    is_virtual BOOLEAN NOT NULL DEFAULT FALSE -- Differentiates transient card game instances from physical inventory
+    is_virtual BOOLEAN NOT NULL DEFAULT FALSE, -- Differentiates transient card game instances from physical inventory
+    version INT NOT NULL DEFAULT 1
 );
 
 -- 2.1 Play Area Supported Games Mapping
@@ -49,6 +50,7 @@ CREATE TABLE play_area_reservations (
     scheduled_end_time TIMESTAMPTZ NOT NULL,
     buffer_padding_minutes INT NOT NULL DEFAULT 15,
     status VARCHAR(50) NOT NULL, -- CONFIRMED, ACTIVE, COMPLETED, CANCELLED
+    game_type VARCHAR(50) NOT NULL, -- BOLA_8, PINGPONG, PEBOLIM, TRUCO, BURACO, SNOOKER
     version INT NOT NULL DEFAULT 1, -- Version column shifted to reservation slot to avoid table bottleneck
     CONSTRAINT check_times CHECK (scheduled_end_time > scheduled_start_time),
     CONSTRAINT unique_play_area_slot UNIQUE (play_area_id, scheduled_start_time, scheduled_end_time)

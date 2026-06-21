@@ -1001,7 +1001,7 @@ The HTTP controller imports only the \texttt{IEnrollPlayerUseCase} interface typ
 \textbf{Domain Class} & \textbf{PG Table} & \textbf{Key Constraints} \\
 \midrule
 User & users & UNIQUE(nusp), UNIQUE(email), FK(institute\_id), FK(course\_id) \\
-PlayAreaReservation & play\_area\_reservations & FK(play\_area\_id), CHECK(end > start), version INTEGER \\
+PlayAreaReservation & play\_area\_reservations & FK(play\_area\_id), CHECK(end > start), game\_type VARCHAR, version INTEGER \\
 EloLedger & elo\_ledger & FK(user\_id, match\_id, season\_id), IMMUTABLE rows \\
 GroupStanding & group\_standings & COMPOSITE PK(tournament\_id, team\_id) \\
 CheckoutRecord & checkout\_records & FK(equipment\_id, user\_id), FK(reservation\_id) NULLABLE \\

@@ -100,6 +100,24 @@ Unified campus sports, matchmaking, and reservation portal structured as a Hexag
 - **Validation**: Enforces sequential stages for dependency checking, linting, type-checking, and test suite execution.
 - **Optimized Compilation**: Triggers a multi-stage Docker build (based on `backend/Dockerfile`) with optimized GitHub Actions caching (`cache-from: type=gha`, `cache-to: type=gha,mode=max`) to mitigate pipeline execution lag.
 
+### 5. Facilities & Reservations (Phase 3)
+- **Custom DI Tokens**:
+  - `IPlayAreaRepositoryPortToken`: Maps `IPlayAreaRepositoryPort` to persistence repository adapter.
+  - `IPlayAreaReservationRepositoryPortToken`: Maps `IPlayAreaReservationRepositoryPort` to persistence repository adapter.
+  - `IReservationUseCaseToken`: Maps `IReservationUseCase` to core domain reservation service.
+- **Reservation State Machine**:
+  - Valid transitions: `CONFIRMED` -> `ACTIVE` -> `COMPLETED`.
+  - Cancellation transitions: `CONFIRMED` / `ACTIVE` -> `CANCELLED`. Invalid state transitions throw exception.
+- **Concurrency & Transaction Control**:
+  - Overrides write paths to execute within `SERIALIZABLE` transaction isolation level.
+  - Implements Optimistic Concurrency Control (OCC) via `@VersionColumn()` on `PlayArea` entity.
+  - Allocation path throws custom `OptimisticLockException` if transaction fails to lock (affected count 0, database busy, or serialization failures).
+- **Open API REST Endpoints (JwtAuthGuard-Protected)**:
+  - `POST /reservations`: Create timeslot booking (enforces max 14-day limit, overlap conflicts, and OCC).
+  - `POST /reservations/:id/activate`: Transitions reservation status to `ACTIVE`.
+  - `POST /reservations/:id/complete`: Transitions reservation status to `COMPLETED`.
+  - `POST /reservations/:id/cancel`: Transitions reservation status to `CANCELLED`.
+
 ---
 
 ## Developer Onboarding & Setup

@@ -144,6 +144,9 @@ export class PlayAreaReservation {
   @Column({ type: "varchar", length: 50 })
   status: string; // CONFIRMED | ACTIVE | COMPLETED | CANCELLED
 
+  @Column({ name: "game_type", type: "varchar" })
+  gameType: string; // BOLA_8 | PINGPONG | PEBOLIM | etc.
+
   @VersionColumn()
   version: number; // OCC tracked on slot level to prevent billiard table bottlenecks
 
@@ -958,6 +961,9 @@ export class PlayAreaReservationEntity {
 
   @Column({ type: 'varchar' })
   status: string; // CONFIRMED | ACTIVE | COMPLETED | CANCELLED
+
+  @Column({ name: 'game_type', type: 'varchar' })
+  gameType: string; // BOLA_8 | PINGPONG | etc.
 
   @VersionColumn()
   version: number; // OCC mapped to reservation slot to avoid blockades

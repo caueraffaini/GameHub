@@ -9,6 +9,8 @@ export class PlayArea {
   supportedGameTypes: GameType[]; // Decouples game types from single hardcoded associations
   status: PlayAreaStatus;
   isVirtual: boolean; // Differentiates transient card game instances from physical inventory
+  isActive: boolean;
+  version?: number;
 
   constructor(init?: Partial<PlayArea>) {
     Object.assign(this, init);
