@@ -1688,6 +1688,11 @@ API endpoints for authentication yield valid access tokens, enforce route protec
 
 Medium (3/5).
 
+### Operational Deployment Status
+
+The identity, authentication, and team management logic is fully implemented under `src/modules/identity/`. The secure 4-digit PIN authentication verification is integrated directly into the rich `User` domain model. Access control is enforced via custom `@Roles` metadata annotations and framework guards (`JwtAuthGuard`, `RolesGuard`). The relational database schema in `schema.sql` has been updated to include indices, `teams`, and `team_rosters` layout mappings.
+
+
 ## Phase 3: Facilities & Reservations
 
 ### Objectives

@@ -85,3 +85,30 @@ CREATE TABLE matches (
 
 CREATE INDEX idx_matches_reservation ON matches(play_area_reservation_id);
 CREATE INDEX idx_matches_status ON matches(status);
+
+-- 6. Teams Table
+CREATE TABLE teams (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(100) NOT NULL,
+    captain_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    type VARCHAR(50) NOT NULL, -- OFFICIAL, TEMPORARY
+    institute_id UUID DEFAULT NULL,
+    is_active_competition_team BOOLEAN DEFAULT NULL,
+    associated_event_id UUID DEFAULT NULL,
+    expires_at TIMESTAMPTZ DEFAULT NULL
+);
+
+CREATE INDEX idx_teams_captain ON teams(captain_id);
+
+-- 7. Team Rosters Table
+CREATE TABLE team_rosters (
+    team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE', -- ACTIVE, INVITATION_PENDING, REMOVED
+    seed_number INT NOT NULL DEFAULT 0,
+    PRIMARY KEY (team_id, user_id)
+);
+
+CREATE INDEX idx_team_rosters_user ON team_rosters(user_id);

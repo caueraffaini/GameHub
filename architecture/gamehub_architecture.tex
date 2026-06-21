@@ -1719,6 +1719,11 @@ API endpoints for authentication yield valid access tokens, enforce route protec
 \subsection{Estimated Implementation Complexity}
 Medium (3/5).
 
+\subsection{Operational Deployment Status}
+The identity, authentication, and team management logic is fully implemented under \texttt{src/modules/identity/}. The secure 4-digit PIN authentication verification is integrated directly into the rich \texttt{User} domain model. Access control is enforced via custom \texttt{@Roles} metadata annotations and framework guards (\texttt{JwtAuthGuard}, \texttt{RolesGuard}). The relational database schema in \texttt{schema.sql} has been updated to include indices, \texttt{teams}, and \texttt{team\_rosters} layout mappings.
+
+
+
 \section{Phase 3: Facilities \& Reservations}
 \subsection{Objectives}
 Implement play areas mapping, timeslot creation, and reservation locking logic preventing double bookings.
