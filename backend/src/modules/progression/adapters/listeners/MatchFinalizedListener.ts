@@ -132,6 +132,7 @@ export class MatchFinalizedListener implements OnModuleInit, OnModuleDestroy {
       ledger1.newRating = newRating1;
       ledger1.changeAmount = outcome.playerADelta;
       ledger1.calculatedAt = new Date();
+      ledger1.status = 'COMPLETED';
       await entityManager.save(EloLedgerEntity, ledger1);
 
       const ledger2 = new EloLedgerEntity();
@@ -144,6 +145,7 @@ export class MatchFinalizedListener implements OnModuleInit, OnModuleDestroy {
       ledger2.newRating = newRating2;
       ledger2.changeAmount = outcome.playerBDelta;
       ledger2.calculatedAt = new Date();
+      ledger2.status = 'COMPLETED';
       await entityManager.save(EloLedgerEntity, ledger2);
     });
   }

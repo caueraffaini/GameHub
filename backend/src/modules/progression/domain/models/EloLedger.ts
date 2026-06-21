@@ -10,6 +10,7 @@ export class EloLedger {
   newRating: number;
   changeAmount: number;
   calculatedAt: Date;
+  status: string;
 
   constructor(init?: Partial<EloLedger>) {
     Object.assign(this, init);

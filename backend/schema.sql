@@ -169,7 +169,8 @@ CREATE TABLE elo_ledger (
     old_rating INT NOT NULL,
     new_rating INT NOT NULL,
     change_amount INT NOT NULL,
-    calculated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    calculated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    status VARCHAR(50) NOT NULL DEFAULT 'COMPLETED'
 );
 
 CREATE INDEX idx_elo_ledger_user ON elo_ledger(user_id);
@@ -233,6 +234,79 @@ CREATE TABLE group_standings (
 
 CREATE INDEX idx_group_standings_tournament ON group_standings(tournament_id);
 CREATE INDEX idx_group_standings_team ON group_standings(team_id);
+
+-- 17. Friendships Table
+CREATE TABLE friendships (
+    user_id1 UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id2 UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    established_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    status VARCHAR(50) NOT NULL, -- PENDING, ACCEPTED, BLOCKED
+    PRIMARY KEY (user_id1, user_id2)
+);
+
+CREATE INDEX idx_friendships_user1 ON friendships(user_id1);
+CREATE INDEX idx_friendships_user2 ON friendships(user_id2);
+
+-- 18. Chat Channels Table
+CREATE TABLE chat_channels (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    type VARCHAR(50) NOT NULL, -- PRIVATE_MESSAGE, LOBBY, MATCH_ROOM
+    associated_resource_id UUID DEFAULT NULL
+);
+
+-- 19. Chat Messages Table
+CREATE TABLE chat_messages (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    channel_id UUID NOT NULL REFERENCES chat_channels(id) ON DELETE CASCADE,
+    sender_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_chat_messages_channel ON chat_messages(channel_id);
+
+-- 20. Match Disputes Table
+CREATE TABLE match_disputes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    match_id UUID NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+    raised_by_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    reason TEXT NOT NULL,
+    status VARCHAR(50) NOT NULL, -- UNDER_REVIEW, RESOLVED, DISMISSED
+    resolved_at TIMESTAMPTZ DEFAULT NULL,
+    resolved_by_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    resolution_notes TEXT DEFAULT NULL
+);
+
+CREATE INDEX idx_match_disputes_match ON match_disputes(match_id);
+
+-- 21. Generic Reports Table
+CREATE TABLE generic_reports (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    reported_by_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    target_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    reason VARCHAR(255) NOT NULL,
+    details TEXT NOT NULL,
+    reported_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    status VARCHAR(50) NOT NULL -- OPEN, INVESTIGATING, CLOSED
+);
+
+CREATE INDEX idx_generic_reports_target ON generic_reports(target_user_id);
+
+-- 22. User Sanctions Table
+CREATE TABLE user_sanctions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type VARCHAR(50) NOT NULL, -- WARNING, TEMP_BAN, PERMANENT_BAN
+    reason TEXT NOT NULL,
+    started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMPTZ NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_by_id UUID REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE INDEX idx_user_sanctions_user ON user_sanctions(user_id);
+CREATE INDEX idx_user_sanctions_active ON user_sanctions(is_active);
+
 
 
 

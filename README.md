@@ -166,6 +166,26 @@ Unified campus sports, matchmaking, and reservation portal structured as a Hexag
   - `GET /tournaments/:id/standings`: Retrieves sorted group standings (Round Robin).
   - `GET /events/:id/leaderboard`: Retrieves sorted event leaderboard scores.
 
+### 9. Social & Moderation (Phase 7)
+- **Real-Time Chat & Block Filters**:
+  - Implements the `ChatGateway` under the `/chat` namespace.
+  - Supports private messaging (`PRIVATE_MESSAGE`), match room (`MATCH_ROOM`), and campus lobby (`LOBBY`) channels.
+  - Friendship block filter: intercepts and evaluates block states before dispatching messages. If friendship status between the sender and recipient (or the channel participant) is set to `BLOCKED`, the gateway completely rejects the transmission vector.
+- **Redis Token-Bucket Rate Limiter**:
+  - Chat spam mitigation: implements a Redis-backed token bucket algorithm to rate-limit WebSocket message frames.
+  - Bucket Configuration: Capacity of 5 tokens, refill rate of 1 token/second.
+  - Rejection: Returns a standardized `chat_error` event with `SPAM_REJECTED` status to the sender without crashing the gateway connection pipeline.
+- **Match Disputes & ELO Locking Coordination**:
+  - Create dispute: Transition ELO ledger records for the matching match to a `LOCKED` state immediately in a transaction, preventing further progression runs or modifications, and fires an admin dashboard logging alert.
+  - Resolve dispute: Transition dispute to `RESOLVED`, recalculates correct ELO values if a correction is supplied (using `EloRatingService`), structurally updates the `PlayerRanking` values by subtracting the old delta and adding the correct one, corrects the ledger entries, and transitions ledger status back to `COMPLETED` (unlocked).
+- **Sanction Cascades Background Worker (BullMQ)**:
+  - Worker `sanction-cascade` processes ban activations (`TEMP_BAN`, `PERMANENT_BAN`).
+  - Ban activation transaction:
+    - Sets user availability status to `OFFLINE`.
+    - Purges all active matchmaking tickets (status `WAITING` transitions to `CANCELLED`).
+    - Cancels upcoming play area reservations (status `CONFIRMED` transitions to `CANCELLED`).
+    - Dispatches a high-priority native silent push notification (payload: `USER_BANNED`) to clear out mobile device state.
+
 ---
 
 ## Developer Onboarding & Setup

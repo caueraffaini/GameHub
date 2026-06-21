@@ -32,6 +32,9 @@ export class EloLedgerEntity {
   @Column({ name: 'calculated_at', default: () => 'CURRENT_TIMESTAMP' })
   calculatedAt: Date;
 
+  @Column({ default: 'COMPLETED' })
+  status: string;
+
   static toEntity(model: EloLedger): EloLedgerEntity {
     const entity = new EloLedgerEntity();
     entity.id = model.id;
@@ -45,6 +48,7 @@ export class EloLedgerEntity {
     if (model.calculatedAt) {
       entity.calculatedAt = model.calculatedAt;
     }
+    entity.status = model.status || 'COMPLETED';
     return entity;
   }
 
@@ -59,6 +63,7 @@ export class EloLedgerEntity {
       newRating: this.newRating,
       changeAmount: this.changeAmount,
       calculatedAt: this.calculatedAt,
+      status: this.status,
     });
   }
 }
