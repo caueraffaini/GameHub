@@ -14,16 +14,16 @@ import { TeamRosterEntity } from '../../../identity/adapters/persistence/TeamRos
 import { PlayAreaEntity } from '../../../facilities/adapters/persistence/PlayArea.entity';
 import { PlayAreaReservationEntity } from '../../../facilities/adapters/persistence/PlayAreaReservation.entity';
 import { PlayAreaSupportedGameEntity } from '../../../facilities/adapters/persistence/PlayAreaSupportedGame.entity';
-import { MatchEntity } from '../../adapters/persistence/Match.entity';
+import { MatchEntity } from '../../../matches/adapters/persistence/Match.entity';
 import { MatchmakingTicketEntity } from '../../adapters/persistence/MatchmakingTicket.entity';
 import { DeviceTokenEntity } from '../../adapters/persistence/DeviceToken.entity';
 import { IUserRepositoryPort, IUserRepositoryPortToken } from '../../../identity/ports/outbound/IUserRepositoryPort';
 import { ITicketRepositoryPort, ITicketRepositoryPortToken } from '../../ports/outbound/ITicketRepositoryPort';
-import { IMatchRepositoryPort, IMatchRepositoryPortToken } from '../../ports/outbound/IMatchRepositoryPort';
+import { IMatchRepositoryPort, IMatchRepositoryPortToken } from '../../../matches/ports/outbound/IMatchRepositoryPort';
 import { IPlayAreaReservationRepositoryPort, IPlayAreaReservationRepositoryPortToken } from '../../../facilities/ports/outbound/IPlayAreaReservationRepositoryPort';
 import { IDeviceTokenRepositoryPort, IDeviceTokenRepositoryPortToken } from '../../ports/outbound/IDeviceTokenRepositoryPort';
 import { INotificationServicePortToken } from '../../ports/outbound/INotificationServicePort';
-import { IForfeitMatchUseCaseToken } from '../../ports/inbound/IForfeitMatchUseCase';
+import { IForfeitMatchUseCaseToken } from '../../../matches/ports/inbound/IForfeitMatchUseCase';
 import { HeartbeatTimeoutProcessor } from '../../adapters/workers/HeartbeatTimeoutProcessor';
 import { Job } from 'bullmq';
 

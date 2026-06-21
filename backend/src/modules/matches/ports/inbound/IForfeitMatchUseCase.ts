@@ -1,4 +1,4 @@
-// src/modules/matchmaking/ports/inbound/IForfeitMatchUseCase.ts
+// src/modules/matches/ports/inbound/IForfeitMatchUseCase.ts
 
 export interface ForfeitMatchDto {
   matchId: string;

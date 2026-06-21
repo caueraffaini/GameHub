@@ -5,11 +5,11 @@ import { Job } from 'bullmq';
 import { Inject } from '@nestjs/common';
 import { IUserRepositoryPort, IUserRepositoryPortToken } from '../../../identity/ports/outbound/IUserRepositoryPort';
 import { ITicketRepositoryPort, ITicketRepositoryPortToken } from '../../ports/outbound/ITicketRepositoryPort';
-import { IMatchRepositoryPort, IMatchRepositoryPortToken } from '../../ports/outbound/IMatchRepositoryPort';
+import { IMatchRepositoryPort, IMatchRepositoryPortToken } from '../../../matches/ports/outbound/IMatchRepositoryPort';
 import { IPlayAreaReservationRepositoryPort, IPlayAreaReservationRepositoryPortToken } from '../../../facilities/ports/outbound/IPlayAreaReservationRepositoryPort';
 import { IDeviceTokenRepositoryPort, IDeviceTokenRepositoryPortToken } from '../../ports/outbound/IDeviceTokenRepositoryPort';
 import { INotificationServicePort, INotificationServicePortToken } from '../../ports/outbound/INotificationServicePort';
-import { IForfeitMatchUseCase, IForfeitMatchUseCaseToken } from '../../ports/inbound/IForfeitMatchUseCase';
+import { IForfeitMatchUseCase, IForfeitMatchUseCaseToken } from '../../../matches/ports/inbound/IForfeitMatchUseCase';
 
 @Processor('heartbeat-timeout-handler')
 export class HeartbeatTimeoutProcessor extends WorkerHost {

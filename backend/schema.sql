@@ -81,6 +81,10 @@ CREATE TABLE matches (
     play_area_reservation_id UUID REFERENCES play_area_reservations(id) ON DELETE SET NULL,
     player1_id UUID REFERENCES users(id) ON DELETE SET NULL,
     player2_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    player1_score INT DEFAULT NULL,
+    player2_score INT DEFAULT NULL,
+    winner_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    forfeited_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
     game_type VARCHAR(50) NOT NULL,
     status VARCHAR(50) NOT NULL, -- PENDING_RESOURCE_ALLOCATION, IN_PROGRESS, COMPLETED, DISPUTED, CANCELLED
     started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -126,4 +130,50 @@ CREATE TABLE device_tokens (
 );
 
 CREATE INDEX idx_device_tokens_user ON device_tokens(user_id);
+
+-- 9. Seasons Table
+CREATE TABLE seasons (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(100) NOT NULL,
+    start_time TIMESTAMPTZ NOT NULL,
+    end_time TIMESTAMPTZ NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT FALSE,
+    CONSTRAINT check_season_times CHECK (end_time > start_time)
+);
+
+CREATE INDEX idx_seasons_active ON seasons(is_active);
+
+-- 10. Player Rankings Table
+CREATE TABLE player_rankings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    season_id UUID NOT NULL REFERENCES seasons(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    team_id UUID DEFAULT NULL REFERENCES teams(id) ON DELETE SET NULL,
+    game_type VARCHAR(50) NOT NULL,
+    elo_value INT NOT NULL DEFAULT 1500,
+    games_played INT NOT NULL DEFAULT 0,
+    last_match_at TIMESTAMPTZ DEFAULT NULL,
+    CONSTRAINT unique_season_user_game UNIQUE (season_id, user_id, game_type)
+);
+
+CREATE INDEX idx_player_rankings_user ON player_rankings(user_id);
+CREATE INDEX idx_player_rankings_season ON player_rankings(season_id);
+
+-- 11. Elo Ledger Table
+CREATE TABLE elo_ledger (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    team_id UUID DEFAULT NULL REFERENCES teams(id) ON DELETE SET NULL,
+    match_id UUID NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+    season_id UUID NOT NULL REFERENCES seasons(id) ON DELETE CASCADE,
+    old_rating INT NOT NULL,
+    new_rating INT NOT NULL,
+    change_amount INT NOT NULL,
+    calculated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_elo_ledger_user ON elo_ledger(user_id);
+CREATE INDEX idx_elo_ledger_match ON elo_ledger(match_id);
+CREATE INDEX idx_elo_ledger_season ON elo_ledger(season_id);
+
 

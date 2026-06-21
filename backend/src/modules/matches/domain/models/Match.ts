@@ -1,4 +1,4 @@
-// src/modules/matchmaking/domain/models/Match.ts
+// src/modules/matches/domain/models/Match.ts
 
 import { GameType } from '../../../facilities/domain/models/PlayArea';
 
@@ -11,9 +11,13 @@ export type MatchStatus =
 
 export class Match {
   id: string;
-  playAreaReservationId: string | null; // Optional/nullable for virtual card games which bypass physical reservations
+  playAreaReservationId: string | null;
   player1Id: string | null;
   player2Id: string | null;
+  player1Score: number | null;
+  player2Score: number | null;
+  winnerId: string | null;
+  forfeitedUserId: string | null;
   gameType: GameType;
   status: MatchStatus;
   startedAt: Date;

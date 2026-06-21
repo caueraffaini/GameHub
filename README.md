@@ -135,6 +135,20 @@ Unified campus sports, matchmaking, and reservation portal structured as a Hexag
   - **Step 4**: Cancels upcoming `PlayAreaReservation`s for the forfeiting user.
   - **Step 5**: Retrieves user's registered push tokens and dispatches silent push notification payloads via `INotificationServicePort` with event name `HEARTBEAT_EXPIRED`.
 
+### 7. Matches & Progression (Phase 5)
+- **Match Lifecycle State Machine**:
+  - Encapsulates match transitions across `PENDING_RESOURCE_ALLOCATION`, `IN_PROGRESS`, `COMPLETED`, `DISPUTED`, and `CANCELLED`.
+- **Score Submission & Validation**:
+  - Enforces strict scoring boundaries per `GameType` (e.g. `PINGPONG` requires $\ge 11$ points and win-by-2 if score exceeds 11; `PEBOLIM` requires $\ge 5$; `TRUCO` requires $\ge 12$).
+  - Implements ELO-safe forfeit semantics: winner receives default maximum score (11 for physical games, 2 for card games) while forfeiter is locked at 0.
+- **Transactional ELO Calculation Engine**:
+  - Listens to `MatchFinalizedEvent` and executes ELO rating adjustments sequentially (using RxJS `concatMap`) within highly isolated `SERIALIZABLE` database transactions.
+  - Appends ELO change vector traces to the structurally immutable `elo_ledger` table.
+  - Updates `PlayerRanking` records atomically.
+  - Anti-Inflation Mitigation: Caps maximum ELO delta changes to `+/- 32` per match.
+- **REST Endpoints (JwtAuthGuard-Protected)**:
+  - `POST /matches/:id/score`: Submit scores and finalize match.
+
 ---
 
 ## Developer Onboarding & Setup
