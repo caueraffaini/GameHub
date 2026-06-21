@@ -141,6 +141,7 @@ export class ReservationService implements IReservationUseCase {
         error.code === '40001' || // PostgreSQL serialization failure
         error.message?.includes('SQLITE_BUSY') ||
         error.message?.includes('database is locked') ||
+        error.message?.includes('cannot start a transaction') ||
         error instanceof OptimisticLockException
       ) {
         throw new OptimisticLockException(`Concurrency lock failure: ${error.message || 'database busy'}`);

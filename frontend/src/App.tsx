@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { create } from 'zustand';
 import { 
   User as UserIcon, 
@@ -8,10 +8,15 @@ import {
   Lock, 
   CheckCircle, 
   AlertTriangle,
-  LogOut
+  LogOut,
+  Wifi,
+  WifiOff,
+  Flame,
+  Send
 } from 'lucide-react';
 import { useAuthStore } from './shared/auth-store';
 import type { UserProfile } from './shared/auth-store';
+import { useSocketStore } from './shared/socket-store';
 import AuthGuard from './shared/AuthGuard';
 
 // Define layout tabs
@@ -35,6 +40,9 @@ interface AppStore {
   setQueueStatus: (status: AppStore['queueStatus']) => void;
   ticketLock: string | null;
   setTicketLock: (lock: string | null) => void;
+  matchTimer: number;
+  incrementTimer: () => void;
+  resetTimer: () => void;
 }
 
 const useAppStore = create<AppStore>((set) => ({
@@ -44,6 +52,9 @@ const useAppStore = create<AppStore>((set) => ({
   setQueueStatus: (status) => set({ queueStatus: status }),
   ticketLock: null,
   setTicketLock: (lock) => set({ ticketLock: lock }),
+  matchTimer: 0,
+  incrementTimer: () => set((state) => ({ matchTimer: state.matchTimer + 1 })),
+  resetTimer: () => set({ matchTimer: 0 }),
 }));
 
 export default function App() {
@@ -61,16 +72,64 @@ function GameHubApp() {
     queueStatus,
     setQueueStatus,
     ticketLock,
-    setTicketLock
+    setTicketLock,
+    matchTimer,
+    incrementTimer,
+    resetTimer
   } = useAppStore();
 
   const { user, setSession, clearSession } = useAuthStore();
+  const { connect, disconnect, socket, state: socketState } = useSocketStore();
+  
   const [notification, setNotification] = useState<{
     type: 'success' | 'warning' | 'info';
     message: string;
   } | null>(null);
 
-  // If user session is cleared, fallback logic (should be handled by AuthGuard anyway)
+  // Score reporting inputs
+  const [playerScore, setPlayerScore] = useState<string>('0');
+  const [opponentScore, setOpponentScore] = useState<string>('0');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Initialize and connect socket session on boot
+  useEffect(() => {
+    if (user) {
+      const serverUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      connect(serverUrl, user.id);
+    }
+    return () => {
+      disconnect();
+    };
+  }, [user, connect, disconnect]);
+
+  // Queue timer simulation
+  useEffect(() => {
+    let timer: ReturnType<typeof setInterval> | null = null;
+    if (queueStatus === 'QUEUED') {
+      timer = setInterval(() => {
+        incrementTimer();
+      }, 1000);
+    } else {
+      resetTimer();
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [queueStatus, incrementTimer, resetTimer]);
+
+  // Mock auto-matching logic
+  useEffect(() => {
+    if (queueStatus === 'QUEUED' && matchTimer >= 8) {
+      setTimeout(() => {
+        setQueueStatus('MATCHED');
+        setNotification({
+          type: 'success',
+          message: 'Match Formed! Table Reserved. Transitioning to Live Match View.',
+        });
+      }, 0);
+    }
+  }, [queueStatus, matchTimer, setQueueStatus]);
+
   if (!user) {
     return null;
   }
@@ -97,6 +156,10 @@ function GameHubApp() {
       type: 'success',
       message: `Redis Lock acquired: ${lockKey} (Expires 600s). Enqueued in ZSET: gamehub:${user.instituteId.toLowerCase()}:queue:bola_8`,
     });
+
+    if (socket) {
+      socket.emit('enter_queue', { userId: user.id, gameType: 'BOLA_8' });
+    }
   };
 
   // Simulate "Matched but Homeless" OCC version check collision
@@ -129,6 +192,7 @@ function GameHubApp() {
           message: 'Recovery loop finished: Ticket re-inserted with priority score 0 (absolute front priority).',
         });
         setQueueStatus('QUEUED');
+        resetTimer();
       }, 3000);
     }, 1500);
   };
@@ -140,6 +204,54 @@ function GameHubApp() {
       type: 'info',
       message: 'Redis Lock released, matchmaking ticket cancelled.',
     });
+
+    if (socket) {
+      socket.emit('leave_queue', { userId: user.id });
+    }
+  };
+
+  // Score validation & submission over Socket.io
+  const handleSubmitScore = (forfeitPlayer?: 'player' | 'opponent') => {
+    setIsSubmitting(true);
+
+    let finalPlayerScore = parseInt(playerScore, 10);
+    let finalOpponentScore = parseInt(opponentScore, 10);
+
+    if (isNaN(finalPlayerScore)) finalPlayerScore = 0;
+    if (isNaN(finalOpponentScore)) finalOpponentScore = 0;
+
+    // Apply strict forfeit ELO boundaries: winner gets default max (11), forfeiter gets locked at 0
+    let isForfeit = false;
+    if (forfeitPlayer === 'player') {
+      finalPlayerScore = 0;
+      finalOpponentScore = 11;
+      isForfeit = true;
+    } else if (forfeitPlayer === 'opponent') {
+      finalPlayerScore = 11;
+      finalOpponentScore = 0;
+      isForfeit = true;
+    }
+
+    if (socket) {
+      socket.emit('report_score', {
+        matchId: 'match_01jm945fa29_active',
+        player1Score: finalPlayerScore,
+        player2Score: finalOpponentScore,
+        isForfeit,
+      });
+    }
+
+    setTimeout(() => {
+      setQueueStatus('IDLE');
+      setTicketLock(null);
+      setIsSubmitting(false);
+      setPlayerScore('0');
+      setOpponentScore('0');
+      setNotification({
+        type: 'success',
+        message: `Score reported successfully: ${finalPlayerScore} x ${finalOpponentScore}. Match finalized.`,
+      });
+    }, 1000);
   };
 
   const handleUpdateProfile = (fields: Partial<UserProfile>) => {
@@ -153,6 +265,13 @@ function GameHubApp() {
     };
     const mockToken = `header.${btoa(JSON.stringify(mockPayload))}.signature`;
     setSession(mockToken, updatedUser);
+  };
+
+  // Helper to format timers
+  const formatTime = (secs: number) => {
+    const m = Math.floor(secs / 60).toString().padStart(2, '0');
+    const s = (secs % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
   };
 
   return (
@@ -222,8 +341,8 @@ function GameHubApp() {
         <div className="p-4 border-t-2 border-primary bg-black/40 text-xs flex flex-col gap-1 text-gray-400">
           <div>Client: Capacitor v5.0 (WebKit)</div>
           <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>
-            <span>Real-time presence active</span>
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+            <span>Presence heartbeat active</span>
           </div>
         </div>
       </aside>
@@ -243,14 +362,19 @@ function GameHubApp() {
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Status indicators */}
+            {/* Realtime Socket State Indicator Badge */}
+            <div className={`flex items-center gap-1.5 px-3 py-1 border text-xs font-bold ${
+              socketState === 'CONNECTED' ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300' :
+              socketState === 'CONNECTING' || socketState === 'RECONNECTING' ? 'bg-amber-950/40 border-highlight/50 text-highlight' :
+              'bg-red-950/40 border-red-500/50 text-red-300'
+            }`}>
+              {socketState === 'CONNECTED' ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
+              <span className="uppercase tracking-wider">{socketState}</span>
+            </div>
+
             <div className="hidden sm:flex items-center gap-2 bg-black px-3 py-1 border border-primary text-xs">
               <span className="text-gray-400">Campus:</span>
               <span className="text-accent font-bold">{user.instituteId}</span>
-            </div>
-            <div className="bg-primary/40 px-3 py-1 border border-accent/40 text-xs flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-              <span className="font-bold text-gray-200">ONLINE</span>
             </div>
           </div>
         </header>
@@ -281,70 +405,150 @@ function GameHubApp() {
           {/* TAB 1: MATCHMAKING */}
           {activeTab === 'matchmaking' && (
             <div className="space-y-6">
-              <div className="bg-surface border-2 border-primary p-6 space-y-4">
-                <h2 className="text-xl font-bold tracking-wider text-accent border-b border-primary pb-2">
-                  CAMPUS MATCHMAKING HUB
-                </h2>
-                <p className="text-sm text-gray-300">
-                  Select game mode to match with available students at {user.instituteId}. Queue utilizes native Redis ZSET score ranking.
-                </p>
+              
+              {/* LOBBY INTERFACE STATE: IDLE, QUEUED, OR HOMELESS */}
+              {queueStatus !== 'MATCHED' ? (
+                <div className="bg-surface border-2 border-primary p-6 space-y-4">
+                  <h2 className="text-xl font-bold tracking-wider text-accent border-b border-primary pb-2 flex items-center gap-2">
+                    <Flame className="w-6 h-6 text-accent" />
+                    <span>CAMPUS MATCHMAKING LOBBY</span>
+                  </h2>
+                  <p className="text-sm text-gray-300">
+                    Enter the lobby pool. The pairing engine matches opponents according to ELO ranges.
+                  </p>
 
-                {/* Queue status control block */}
-                <div className="bg-black border border-primary p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Current Status</span>
-                    <div className="flex items-center gap-2">
-                      <span className={`w-3 h-3 rounded-full animate-pulse ${
-                        queueStatus === 'QUEUED' ? 'bg-accent' : 
-                        queueStatus === 'HOMELESS_RECOVERING' ? 'bg-highlight' : 'bg-gray-600'
-                      }`}></span>
-                      <span className="font-extrabold tracking-wider text-lg text-white">
-                        {queueStatus === 'IDLE' && 'DISCONNECTED / IDLE'}
-                        {queueStatus === 'QUEUED' && 'MATCHING IN PROGRESS'}
-                        {queueStatus === 'HOMELESS_RECOVERING' && 'HOMELESS RECOVERY LOOP'}
-                      </span>
+                  {/* Lobby dashboard controller */}
+                  <div className="bg-black border border-primary p-6 flex flex-col sm:flex-row items-center justify-between gap-6">
+                    <div className="space-y-1">
+                      <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Lobby Status</span>
+                      <div className="flex items-center gap-2">
+                        <span className={`w-3.5 h-3.5 rounded-full ${
+                          queueStatus === 'QUEUED' ? 'bg-accent animate-pulse' : 
+                          queueStatus === 'HOMELESS_RECOVERING' ? 'bg-highlight animate-bounce' : 'bg-gray-600'
+                        }`}></span>
+                        <span className="font-black tracking-wider text-lg text-white">
+                          {queueStatus === 'IDLE' && 'LOBBY DISCONNECTED'}
+                          {queueStatus === 'QUEUED' && `SEARCHING... [${formatTime(matchTimer)}]`}
+                          {queueStatus === 'HOMELESS_RECOVERING' && 'COLLISION RECOVERING...'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                      {queueStatus === 'IDLE' ? (
+                        <button
+                          onClick={handleJoinQueue}
+                          disabled={socketState !== 'CONNECTED'}
+                          className="geometric-bevel bg-primary hover:bg-primary/85 border border-accent text-accent font-bold px-6 py-2.5 uppercase text-sm tracking-wider disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                        >
+                          Find Match (8-Ball)
+                        </button>
+                      ) : (
+                        <button
+                          onClick={handleLeaveQueue}
+                          className="geometric-bevel bg-red-950/60 hover:bg-red-900 border border-red-500 text-red-200 font-bold px-6 py-2.5 uppercase text-sm tracking-wider"
+                        >
+                          Cancel Search
+                        </button>
+                      )}
                     </div>
                   </div>
 
-                  <div className="flex gap-3">
-                    {queueStatus === 'IDLE' ? (
+                  {/* Simulate collision event */}
+                  {queueStatus !== 'IDLE' && (
+                    <div className="border border-primary bg-black/40 p-4 space-y-3">
+                      <div className="flex items-center gap-2 text-xs font-bold text-highlight uppercase">
+                        <AlertTriangle className="w-4 h-4" />
+                        <span>Simulate Concurrency Clash</span>
+                      </div>
+                      <p className="text-xs text-gray-400">
+                        Clashes trigger rollback and prioritize the ticket in Redis queue with score 0 (absolute front priority).
+                      </p>
                       <button
-                        onClick={handleJoinQueue}
-                        className="geometric-bevel bg-primary hover:bg-primary/80 border border-accent text-accent font-bold px-6 py-2.5 uppercase text-sm tracking-wider"
+                        onClick={handleSimulateOccCollision}
+                        disabled={queueStatus === 'HOMELESS_RECOVERING'}
+                        className="geometric-bevel-sm bg-surface hover:bg-primary/20 border border-highlight text-highlight font-bold px-4 py-2 text-xs uppercase"
                       >
-                        Enter Queue (8-Ball)
+                        {queueStatus === 'HOMELESS_RECOVERING' ? 'Running Recovery...' : 'Force OCC Booking Clash'}
                       </button>
-                    ) : (
-                      <button
-                        onClick={handleLeaveQueue}
-                        className="geometric-bevel bg-red-950/60 hover:bg-red-900 border border-red-500 text-red-200 font-bold px-6 py-2.5 uppercase text-sm tracking-wider"
-                      >
-                        Cancel Match
-                      </button>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
-
-                {/* Concurrency guard simulation block */}
-                {queueStatus !== 'IDLE' && (
-                  <div className="border border-primary bg-black/40 p-4 space-y-3">
-                    <div className="flex items-center gap-2 text-xs font-bold text-highlight uppercase">
-                      <AlertTriangle className="w-4 h-4" />
-                      <span>Concurrency Simulation Dashboard</span>
+              ) : (
+                // ACTIVE LIVE GAME / SCORE REPORTING SHEET
+                <div className="bg-surface border-2 border-highlight p-6 space-y-6 glow-highlight">
+                  <div className="flex justify-between items-center border-b border-primary pb-3">
+                    <div>
+                      <span className="text-[10px] bg-highlight text-black font-extrabold px-2 py-0.5 tracking-wider uppercase">
+                        Active Live Match
+                      </span>
+                      <h2 className="text-xl font-extrabold tracking-wide mt-1">Billiard Table 01 (Bola-8)</h2>
                     </div>
-                    <p className="text-xs text-gray-400">
-                      Simulate a conflict transaction collision (Optimistic Concurrency Control failure) when reserving table resources.
-                    </p>
+                    <span className="text-xs text-gray-400 font-mono">ID: match_01jm945fa29_active</span>
+                  </div>
+
+                  {/* Competitors Layout */}
+                  <div className="grid grid-cols-7 items-center gap-4 text-center">
+                    <div className="col-span-3 bg-black p-4 border border-primary space-y-2">
+                      <span className="text-xs font-bold text-gray-400 block uppercase">Player (You)</span>
+                      <span className="text-lg font-black text-white block">{user.nickname}</span>
+                      
+                      {/* Score Selector */}
+                      <input 
+                        type="number"
+                        min="0"
+                        max="11"
+                        value={playerScore}
+                        onChange={(e) => setPlayerScore(e.target.value)}
+                        className="w-16 bg-surface border border-accent font-black text-center text-lg text-accent py-1 focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="col-span-1 text-center font-black text-xl text-primary-light">
+                      VS
+                    </div>
+
+                    <div className="col-span-3 bg-black p-4 border border-primary space-y-2">
+                      <span className="text-xs font-bold text-gray-400 block uppercase">Opponent</span>
+                      <span className="text-lg font-black text-white block">ICMC_Boss</span>
+
+                      {/* Score Selector */}
+                      <input 
+                        type="number"
+                        min="0"
+                        max="11"
+                        value={opponentScore}
+                        onChange={(e) => setOpponentScore(e.target.value)}
+                        className="w-16 bg-surface border border-accent font-black text-center text-lg text-accent py-1 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Submission actions */}
+                  <div className="border-t border-primary/40 pt-4 flex flex-col sm:flex-row gap-3 justify-between">
+                    {/* Forfeit triggers */}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleSubmitScore('player')}
+                        disabled={isSubmitting}
+                        className="geometric-bevel-sm bg-red-950/20 hover:bg-red-900 border border-red-500/50 text-red-200 text-xs font-bold px-3 py-2 uppercase"
+                      >
+                        Forfeit Match
+                      </button>
+                    </div>
+
+                    {/* Submit Score */}
                     <button
-                      onClick={handleSimulateOccCollision}
-                      disabled={queueStatus === 'HOMELESS_RECOVERING'}
-                      className="geometric-bevel-sm bg-surface hover:bg-primary/20 border border-highlight text-highlight font-bold px-4 py-2 text-xs uppercase"
+                      onClick={() => handleSubmitScore()}
+                      disabled={isSubmitting}
+                      className="geometric-bevel bg-primary hover:bg-primary/80 border border-accent text-accent font-bold px-6 py-2.5 uppercase text-xs tracking-wider flex items-center gap-2 justify-center"
                     >
-                      {queueStatus === 'HOMELESS_RECOVERING' ? 'Running Recovery...' : 'Simulate OCC Reservation Clash'}
+                      <Send className="w-4 h-4" />
+                      <span>{isSubmitting ? 'Finalizing...' : 'Submit Score Sheet'}</span>
                     </button>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
 
               {/* Active Ticket Locks Status Monitor */}
               <div className="bg-surface border border-primary p-4 space-y-2">
