@@ -1794,17 +1794,54 @@ Active disputes prevent corresponding ELO progression updates. Sanctioned accoun
 \subsection{Estimated Implementation Complexity}
 Medium (3/5).
 
-\section{Phase 8: Frontend (PWA strategies, Offline, Desktop Web)}
-\subsection{Objectives}
-Assemble responsive mobile and desktop client interfaces with service workers, local stores, and offline caches.
-\subsection{Tangible Architectural Deliverables}
-Service worker offline cache control code, Capacitor packaging configs, Zustand local store logic.
+\section{Phase 8: Frontend (Capacitor PWA, React, TypeScript, Zustand)}
+
+\subsection{Technical Stack Constraints}
+\begin{itemize}
+    \item \textbf{Client Engine}: React 18+, TypeScript, Vite, Zustand, and TanStack Query.
+    \item \textbf{Deployment Packaging}: Hybrid packaging via CapacitorJS wrappers to ensure zero-latency native bridge communication and WebKit web views.
+\end{itemize}
+
+\subsection{Phase 8a: UI/UX Guidelines, Typography, and Theme Design Tokens}
+Implement a strict, high-contrast palette with mascot logo design tokens:
+\begin{itemize}
+    \item \textbf{Dark Base / Surfaces}: Rich Black (\texttt{\#000000} / \texttt{\#111111})
+    \item \textbf{Primary Brand Container / Secondary Surfaces}: Midnight Sports Teal (\texttt{\#0A4454})
+    \item \textbf{High-Contrast Accent / Active States}: Pale Electric Yellow (\texttt{\#F9E06B})
+    \item \textbf{Dynamic Warning / Core Highlights}: Emblem Gold (\texttt{\#F5C53B})
+    \item \textbf{Text / Crisp Foreground Contrast}: Pure White (\texttt{\#FFFFFF})
+\end{itemize}
+
+\subsection{Phase 8b: App Navigation Shell \& Layout Boundaries}
+Define application navigation layout:
+\begin{itemize}
+    \item App navigation shell mapping core tab views.
+    \item Strict layout boundaries for desktop web and mobile Capacitor screen viewport frames.
+    \item Differentiated layouts for Public and Private profile structures.
+\end{itemize}
+
+\subsection{Phase 8c: Authentication Guardrails \& State Synchronization}
+Implement frontend credentials lifecycle:
+\begin{itemize}
+    \item WebKit cookie fallback handles HTTP secure cookies on Capacitor mobile containers.
+    \item Session state synchronized using Zustand stores with persisted client sync.
+    \item Client-side route guards enforcing authentication transitions.
+\end{itemize}
+
+\subsection{Phase 8d: Real-Time Feature Synchronization \& Matchmaking}
+Integrate real-time socket events:
+\begin{itemize}
+    \item Matchmaking queue lobbies with status feedback loops.
+    \item Score-reporting dynamic sheets validating input values against tournament and match rules.
+    \item Service Worker caching routines and Capacitor integration for mobile packaging.
+\end{itemize}
+
 \subsection{Strict Technical Dependencies}
 Phase 7 social gateways.
+
 \subsection{Measurable Acceptance Criteria}
-Mobile application launches successfully without active network connection. Push events propagate.
-\subsection{Identified Risks \& Mitigation Protocols}
-\textbf{Cache Invalidation}: Clients run old code versions. Mitigation: Service worker forces reload on update detection.
+Hybrid client packages compile, hot-reload, and authenticate securely. Real-time updates propagate through Zustand stores.
+
 \subsection{Estimated Implementation Complexity}
 High (4/5).
 

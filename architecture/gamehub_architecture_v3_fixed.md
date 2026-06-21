@@ -1804,23 +1804,51 @@ Active disputes prevent corresponding ELO progression updates. Sanctioned accoun
 
 Medium (3/5).
 
-## Phase 8: Frontend (PWA strategies, Offline, Desktop Web)
+## Phase 8: Frontend (Capacitor PWA, React, TypeScript, Zustand)
 
-### Objectives
+### Technical Stack Constraints
 
-Assemble responsive mobile and desktop client interfaces with service workers, local stores, and offline caches.
-### Tangible Architectural Deliverables
+* **Client Engine**: React 18+, TypeScript, Vite, Zustand, and TanStack Query.
+* **Deployment Packaging**: Hybrid packaging via CapacitorJS wrappers to ensure zero-latency native bridge communication and WebKit web views.
 
-Service worker offline cache control code, Capacitor packaging configs, Zustand local store logic.
+### Phase 8a: UI/UX Guidelines, Typography, and Theme Design Tokens
+
+Implement a strict, high-contrast palette with mascot logo design tokens:
+* **Dark Base / Surfaces**: Rich Black (`#000000` / `#111111`)
+* **Primary Brand Container / Secondary Surfaces**: Midnight Sports Teal (`#0A4454`)
+* **High-Contrast Accent / Active States**: Pale Electric Yellow (`#F9E06B`)
+* **Dynamic Warning / Core Highlights**: Emblem Gold (`#F5C53B`)
+* **Text / Crisp Foreground Contrast**: Pure White (`#FFFFFF`)
+
+### Phase 8b: App Navigation Shell & Layout Boundaries
+
+Define application navigation layout:
+* App navigation shell mapping core tab views.
+* Strict layout boundaries for desktop web and mobile Capacitor screen viewport frames.
+* Differentiated layouts for Public and Private profile structures.
+
+### Phase 8c: Authentication Guardrails & State Synchronization
+
+Implement frontend credentials lifecycle:
+* WebKit cookie fallback handles HTTP secure cookies on Capacitor mobile containers.
+* Session state synchronized using Zustand stores with persisted client sync.
+* Client-side route guards enforcing authentication transitions.
+
+### Phase 8d: Real-Time Feature Synchronization & Matchmaking
+
+Integrate real-time socket events:
+* Matchmaking queue lobbies with status feedback loops.
+* Score-reporting dynamic sheets validating input values against tournament and match rules.
+* Service Worker caching routines and Capacitor integration for mobile packaging.
+
 ### Strict Technical Dependencies
 
 Phase 7 social gateways.
+
 ### Measurable Acceptance Criteria
 
-Mobile application launches successfully without active network connection. Push events propagate.
-### Identified Risks & Mitigation Protocols
+Hybrid client packages compile, hot-reload, and authenticate securely. Real-time updates propagate through Zustand stores.
 
-**Cache Invalidation**: Clients run old code versions. Mitigation: Service worker forces reload on update detection.
 ### Estimated Implementation Complexity
 
 High (4/5).
