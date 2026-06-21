@@ -1662,6 +1662,11 @@ Successful pipeline runs verify code linting, run unit tests, build Docker conta
 
 Medium (3/5).
 
+### Operational Deployment Status
+
+The monorepo structure is fully operational using npm workspaces. The CI/CD pipeline is active at `.github/workflows/ci.yml`, incorporating automated build, lint, and test scripts along with multi-stage Docker build steps using the optimized `type=gha` Docker buildx caching provider. Centralized observability bootstrapping is active at `backend/src/shared/telemetry/otel-bootstrap.ts`.
+
+
 ## Phase 2: Core Backend (Auth, RBAC, Users, Teams)
 
 ### Objectives
