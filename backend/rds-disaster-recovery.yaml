@@ -1,0 +1,71 @@
+# backend/rds-disaster-recovery.yaml
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'GameHub AWS RDS PostgreSQL Multi-AZ and Disaster Recovery IaC Manifest'
+
+Resources:
+  GameHubDBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: "Subnets for GameHub Multi-AZ DB Instance"
+      SubnetIds:
+        - !Ref PrivateSubnetA
+        - !Ref PrivateSubnetB
+
+  GameHubDatabase:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: gamehub-db-primary
+      AllocatedStorage: '100'
+      MaxAllocatedStorage: '500' # Auto-scaling storage limit
+      DBInstanceClass: db.m6g.xlarge
+      Engine: postgres
+      EngineVersion: '15'
+      MasterUsername: postgres
+      MasterUserPassword: '{{resolve:secretsmanager:GameHubDatabaseSecret:SecretString:password}}'
+      DBSubnetGroupName: !Ref GameHubDBSubnetGroup
+      VPCSecurityGroups:
+        - !Ref DBSecurityGroup
+      
+      # 1. Multi-AZ Replication (Automated replication & failover to secondary AZ)
+      MultiAZ: true
+      
+      # 2. Automated Backups & PITR (Retention period set to 14 days)
+      BackupRetentionPeriod: 14
+      PreferredBackupWindow: '03:00-04:00'
+      PreferredMaintenanceWindow: 'Sun:04:30-Sun:05:30'
+      CopyTagsToSnapshot: true
+      
+      # Storage encrypted at rest
+      StorageEncrypted: true
+      
+      # Prevent accidental deletion in production
+      DeletionProtection: true
+
+  # AWS Backup Vault and Plan for Daily Snapshots to S3 with multi-region/zone cross-region copy
+  GameHubBackupVault:
+    Type: AWS::Backup::BackupVault
+    Properties:
+      BackupVaultName: GameHubBackupVault
+
+  GameHubBackupPlan:
+    Type: AWS::Backup::BackupPlan
+    Properties:
+      BackupPlan:
+        BackupPlanName: GameHubDisasterRecoveryPlan
+        Rules:
+          - RuleName: DailyBackupRule
+            TargetBackupVaultName: !Ref GameHubBackupVault
+            ScheduleExpression: "cron(0 3 * * ? *)" # Every day at 3 AM UTC
+            StartWindowMinutes: 60
+            CompletionWindowMinutes: 240
+            Lifecycle:
+              DeleteAfterDays: 14
+            CopyActions:
+              - DestinationBackupVaultArn: !Sub "arn:aws:backup:${AWS::SecondaryRegion}:${AWS::AccountId}:backup-vault:Default"
+                Lifecycle:
+                  DeleteAfterDays: 14
+
+Outputs:
+  DBEndpoint:
+    Description: "Database primary endpoint"
+    Value: !GetAtt GameHubDatabase.Endpoint.Address
