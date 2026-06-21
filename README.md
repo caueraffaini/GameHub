@@ -149,6 +149,23 @@ Unified campus sports, matchmaking, and reservation portal structured as a Hexag
 - **REST Endpoints (JwtAuthGuard-Protected)**:
   - `POST /matches/:id/score`: Submit scores and finalize match.
 
+### 8. Events & Tournaments (Phase 6)
+- **Core Bracket Generation Engine**:
+  - Implements complete structural algorithms supporting `SINGLE_ELIMINATION`, `DOUBLE_ELIMINATION`, and `ROUND_ROBIN` formats.
+  - Automatically handles byes in the first round by generating completed bye matches and propagating players to subsequent rounds.
+  - Circle method (Berger tables) for generating optimal, non-overlapping `ROUND_ROBIN` schedules.
+- **Asynchronous Standings & Bracket Worker (BullMQ)**:
+  - Listens to `MatchFinalizedEvent` asynchronously, dispatching jobs to the `tournament-updates` BullMQ queue. This decouples bracket updates from synchronous API requests, mitigating database line locking and transactional deadlocks.
+  - Decoupled `advanceWinner()` logic transitions winners up parent-child nodes via matching `parentSlotId` tree links.
+  - Double elimination loser drop-downs seamlessly map defeated Winners bracket participants into the corresponding Losers bracket slots.
+  - Recalculates `GroupStanding` records (points, matches won/lost, score differential) for Round Robin matches.
+  - Automatically compiles event leaderboards by updating `EventScore` (+10 points for win, +2 points for loss).
+- **REST Endpoints**:
+  - `POST /tournaments`: Generates brackets/pairings, inserts match records, and initializes standings/leaderboards.
+  - `GET /tournaments/:id/bracket`: Retrieves bracket structure including slots and match details.
+  - `GET /tournaments/:id/standings`: Retrieves sorted group standings (Round Robin).
+  - `GET /events/:id/leaderboard`: Retrieves sorted event leaderboard scores.
+
 ---
 
 ## Developer Onboarding & Setup

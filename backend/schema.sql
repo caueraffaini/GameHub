@@ -176,4 +176,63 @@ CREATE INDEX idx_elo_ledger_user ON elo_ledger(user_id);
 CREATE INDEX idx_elo_ledger_match ON elo_ledger(match_id);
 CREATE INDEX idx_elo_ledger_season ON elo_ledger(season_id);
 
+-- 12. Events Table
+CREATE TABLE events (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    creator_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    description TEXT,
+    start_time TIMESTAMPTZ NOT NULL,
+    end_time TIMESTAMPTZ NOT NULL,
+    status VARCHAR(50) NOT NULL -- PLANNING, ACTIVE, COMPLETED
+);
+
+-- 13. Event Scores Table
+CREATE TABLE event_scores (
+    event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    score_value INT NOT NULL DEFAULT 0,
+    last_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (event_id, user_id)
+);
+
+-- 14. Tournaments Table
+CREATE TABLE tournaments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    game_id UUID,
+    format VARCHAR(50) NOT NULL, -- SINGLE_ELIMINATION, DOUBLE_ELIMINATION, ROUND_ROBIN
+    registration_start_time TIMESTAMPTZ NOT NULL,
+    registration_end_time TIMESTAMPTZ NOT NULL,
+    status VARCHAR(50) NOT NULL -- REGISTRATION, ACTIVE, CONCLUDED
+);
+
+-- 15. Tournament Match Slots Table
+CREATE TABLE tournament_match_slots (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tournament_id UUID NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+    round_number INT NOT NULL,
+    match_id UUID REFERENCES matches(id) ON DELETE SET NULL,
+    parent_slot_id UUID REFERENCES tournament_match_slots(id) ON DELETE SET NULL
+);
+
+CREATE INDEX idx_tournament_match_slots_tournament ON tournament_match_slots(tournament_id);
+CREATE INDEX idx_tournament_match_slots_match ON tournament_match_slots(match_id);
+CREATE INDEX idx_tournament_match_slots_parent ON tournament_match_slots(parent_slot_id);
+
+-- 16. Group Standings Table
+CREATE TABLE group_standings (
+    tournament_id UUID NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+    team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+    points INT NOT NULL DEFAULT 0,
+    matches_won INT NOT NULL DEFAULT 0,
+    matches_lost INT NOT NULL DEFAULT 0,
+    score_differential INT NOT NULL DEFAULT 0,
+    PRIMARY KEY (tournament_id, team_id)
+);
+
+CREATE INDEX idx_group_standings_tournament ON group_standings(tournament_id);
+CREATE INDEX idx_group_standings_team ON group_standings(team_id);
+
+
 

@@ -1,3 +1,8 @@
+const workerThreads = require('node:worker_threads');
+if (!workerThreads.markAsUncloneable) {
+  workerThreads.markAsUncloneable = (val) => val;
+}
+
 module.exports = {
   moduleFileExtensions: ['js', 'json', 'ts'],
   rootDir: '.',
