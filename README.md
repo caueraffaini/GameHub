@@ -50,6 +50,14 @@ To maintain modular boundaries and strictly forbid direct cross-module database 
 | `ITeamManagementUseCaseToken` | `ITeamManagementUseCase` | Identity Core Service |
 | `IAuthenticationUseCaseToken` | `IAuthenticationUseCase` | Identity Core Service |
 
+### Design System & Theme Tokens
+The frontend implements a high-contrast theme derived from the mascot logo using the following hex design tokens:
+* **Dark Base / Card Surfaces**: Rich Black (`#000000` / `#111111`)
+* **Primary Brand Container / Secondary Surfaces**: Midnight Sports Teal (`#0A4454`)
+* **High-Contrast Accent / Active States**: Pale Electric Yellow (`#F9E06B`)
+* **Dynamic Warning / Core Highlights**: Emblem Gold (`#F5C53B`)
+* **Text / Foreground Contrast**: Pure White (`#FFFFFF`)
+
 ---
 
 ## 2. Concurrency & Optimistic Concurrency Control (OCC)
@@ -80,9 +88,9 @@ During matchmaking pair allocation, if another process books the selected play a
                       |
                       +---> [OptimisticLockException]
                                    |
-                            [Rollback SQL]
+                             [Rollback SQL]
                                    |
-                     [Re-Queue Tickets (ZSET Score 0)]
+                      [Re-Queue Tickets (ZSET Score 0)]
 ```
 
 ---
